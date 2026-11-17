@@ -46,5 +46,12 @@ Done
 
 Next: M3 web (read-only).
 
+## Work in progress (committed ahead, accepted per milestone)
+
+- M3 web (read-only) is being built in `apps/web` (not committed yet).
+- M4 API side done: SIWE (`/auth/nonce|verify|me|logout`), `POST /backtest`, `POST /strategies`, `PATCH /strategies/:id`, `POST /strategies/:id/deactivate`, `GET /geo` — 24 API tests.
+- M5 pipeline done: strategy templates + backtester + AI helpers (`packages/strategies`, 18 tests); worker runner / executor (commit → execute → reveal, crash recovery) / missed-marker / alerts (23 worker tests). Fork soak (`scripts/soak-fork.ts`): 0 missed reveals, 0 mismatches, crash recovered.
+- M6 tooling: `pnpm check-config` (all 13 tokens verified on-chain via the fork), `pnpm verify-deployment`, `scripts/register-house.ts` (dry run by default), updated `deploy/env.example` and `deploy/DEPLOY.md`.
+
 Known issues
 - Public dRPC rate-limits (429). Use a local anvil fork (pinned block) for development; a paid RPC key for production / CI fork tests (`RPC_URL` secret).

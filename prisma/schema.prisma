@@ -321,4 +321,7 @@ model AlertLog {
   message   String
   data      Json?
   createdAt DateTime @default(now())
+  sentAt    DateTime? // delivered to Telegram
+
+  @@index([sentAt])
 }

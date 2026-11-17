@@ -26,7 +26,7 @@ describe('computeEquity', () => {
       [5, 150],
     ]);
     const r = computeEquity([], s, ['WETH'], t0, t0 + 5 * HOUR);
-    expect(r.points).toHaveLength(6);
+    expect(r.points).toHaveLength(7); // starting point + 6 hourly marks
     expect(r.points[0]!.equity).toBe(100);
     expect(r.points.at(-1)!.equity).toBe(100);
     expect(r.points.at(-1)!.hold).toBe(150);
@@ -42,7 +42,8 @@ describe('computeEquity', () => {
     ];
     const r = computeEquity(trades, s, ['WETH'], t0, t0 + 3 * HOUR);
     expect(r.basis).toBe('paper');
-    expect(r.points[0]!.equity).toBeCloseTo(99.9, 6); // 0.1% cost
+    expect(r.points[0]!.equity).toBe(100); // before any trade
+    expect(r.points[1]!.equity).toBeCloseTo(99.9, 6); // 0.1% cost
     expect(r.points.at(-1)!.equity).toBeCloseTo(119.88, 6);
   });
 

@@ -306,6 +306,20 @@ describe('public API', () => {
   });
 });
 
+describe('geo', () => {
+  it('blocks stock flows only for configured countries from a trusted header', async () => {
+    expect((await app.inject({ url: '/geo', headers: { 'cf-ipcountry': 'US' } })).json()).toMatchObject({
+      country: 'US',
+      stocksBlocked: true,
+    });
+    expect((await app.inject({ url: '/geo', headers: { 'cf-ipcountry': 'ID' } })).json()).toMatchObject({
+      country: 'ID',
+      stocksBlocked: false,
+    });
+    expect((await app.inject('/geo')).json()).toMatchObject({ country: null, stocksBlocked: false });
+  });
+});
+
 describe('websocket topics', () => {
   it('routes events to receipts / strategy / vault subscribers', () => {
     expect(topicsOf({ type: 'receipt.committed', data: { strategyId: 3 } })).toEqual([

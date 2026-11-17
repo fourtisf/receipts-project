@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {Test, console2} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SignalRegistry} from "../../src/SignalRegistry.sol";
 import {ReceiptsVault} from "../../src/ReceiptsVault.sol";
 import {VaultFactory} from "../../src/VaultFactory.sol";
@@ -35,6 +36,7 @@ contract RobinhoodForkTest is Test {
         uint32 staleness;
         uint24 tier;
         bool stock;
+        uint8 decimals;
     }
 
     Tok[] internal toks;
@@ -75,6 +77,7 @@ contract RobinhoodForkTest is Test {
                 tk.tier = uint24(vm.parseJsonUint(json, string.concat(k, ".feeTier")));
             }
             tk.stock = vm.keyExistsJson(json, string.concat(k, ".kind"));
+            tk.decimals = uint8(vm.parseJsonUint(json, string.concat(k, ".decimals")));
             toks.push(tk);
             (t[i], f[i], s[i], tiers[i]) = (tk.token, tk.feed, tk.staleness, tk.tier);
             if (tk.tier == 0) usdg = tk.token;
@@ -144,6 +147,7 @@ contract RobinhoodForkTest is Test {
             assertGt(a, 0, tk.symbol);
             assertEq(feed.decimals(), 8, tk.symbol);
             assertEq(feed.description(), tk.description, tk.symbol);
+            assertEq(IERC20Metadata(tk.token).decimals(), tk.decimals, string.concat(tk.symbol, " decimals"));
             if (tk.tier != 0) {
                 address pool = IUniFactory(uniFactory).getPool(tk.token, usdg, tk.tier);
                 assertTrue(pool != address(0), string.concat(tk.symbol, " pool missing"));

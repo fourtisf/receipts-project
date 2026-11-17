@@ -75,6 +75,8 @@ export function computeEquity(
     return e;
   };
 
+  // the series starts at 100 before any trade, so returns include the cost of the first trade
+  points.push({ at: t0 - step, equity: 100, hold: 100 });
   for (let t = t0; t <= end; t += step) {
     while (ti < sorted.length && sorted[ti]!.at <= t) {
       const tr = sorted[ti]!;

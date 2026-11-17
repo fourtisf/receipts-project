@@ -54,3 +54,26 @@ Decisions made while building, with the reason. Newest at the bottom of each sec
 - **D-040 Token decimals added to `config/robinhood.json`** (verified on-chain; re-checked by the fork test and `scripts/check-config.ts`).
 - **D-041 Fill price and oracle price on receipts** (`fillPriceUsd`, `oraclePriceUsd`, `slippageBps`) to render the prototype's receipt lines.
 - **D-042 Tests use a fresh Postgres schema per file** (`@receipts/db/testing`, non-destructive `migrate deploy`, dropped afterwards); `prisma migrate reset` is never used by tooling.
+
+## M4 — web writes (API side)
+
+- **D-043 SIWE via `viem/siwe`** (no `siwe`/ethers dependency). Nonce single-use and 10-minute expiry, claimed atomically (`updateMany … usedAt: null`). Domain must equal `APP_DOMAIN`, chain 4663, URI `https://APP_DOMAIN` (`http://localhost…` only outside production). EOA signatures verified locally; EIP-1271 smart wallets via an on-chain check. Session cookie `sid`: httpOnly, SameSite=Lax, Secure in production, signed with `SESSION_SECRET`, 7 days.
+- **D-044 `PATCH /strategies/:id` returns a `setMetadataURI` transaction** instead of editing the DB: metadata is content-addressed and pinned on-chain, so renaming creates a new document and the creator signs the URI change (the indexer applies it). `POST /strategies/:id/deactivate` returns `setActive(false)` tx data. The API never sends transactions.
+- **D-045 No backtests for AI templates** (`NO_AI_BACKTEST`): a model run today would see today's news, so an AI "backtest" would be fiction. AI strategies build a live record from their first commit.
+- **D-046 Backtest candles**: Coinbase (fallback Binance) for crypto, Polygon/Alpaca for stocks when `MARKET_DATA_API_KEY` is set, else hourly candles from indexed Chainlink rounds. Cached 10 min per input hash in Redis.
+- **D-047 Writes rate-limited to 20/min** per IP (reads 120/min), shared across API instances through Redis.
+
+## M5 — worker pipeline
+
+- **D-048 Encrypted salt + signal are stored before the commit transaction is sent** (AES-256-GCM, `SALT_ENCRYPTION_KEY`), so any crash between commit and reveal is recoverable: on start and every minute `recoverPending()` reveals open commits; secrets of commits that never landed are dropped (the nonce is reused).
+- **D-049 Local `hashSignal` must equal `SignalRegistry.hashSignal`** (view) before every commit, or the worker refuses to commit.
+- **D-050 Sizing**: BUY spends `sizeBps × allocation`, clamped to allocation headroom (`allocation − exposure`), 99.9% of `remainingDailyUsd()` and the USDG balance; SELL sells `sizeBps` of the holding, clamped to the remaining daily limit. Matches the indexer's match check (D-038).
+- **D-051 Quotes by simulation** (D-010): `eth_call executeSignal(minOut = 0)` from the executor → `minOutFromOperator = simulated × (1 − 0.5%)`; the contract still enforces the oracle minimum. A simulated `0` (breaker would trip) or any revert skips the vault with the decoded reason in the log.
+- **D-052 One executor queue, concurrency 1**: signals run strictly one after another (nonces and reveals stay ordered). Per-key Redis locks guard against an accidental second worker. Executions for many vaults are sent back-to-back (viem nonce manager) and awaited together, so one vault never blocks the others.
+- **D-053 Stuck transactions**: Robinhood Chain (Arbitrum Orbit) has a first-come-first-served sequencer without a priority-fee auction, so the pipeline retries failed sends with backoff instead of gas-bumping replacements; reveal retries continue until the deadline and raise a critical alert 10 min before it.
+- **D-054 Runner state is public**: the paper portfolio a template decides on is rebuilt from the strategy's revealed signals at commit-time Chainlink prices (the same data anyone can read); no hidden state. A strategy with an unrevealed own commit is not evaluated. One evaluation per strategy per hour (Redis key), stocks only during NYSE hours (America/New_York).
+- **D-055 AI runner refuses to trade if `AI_MODEL` ≠ the committed `modelHash`**; temperature 0, strict JSON answer; prompt + inputs + output are stored and published at reveal (`AiArtifact.publishedAt`), never before.
+- **D-056 `markMissed` for every expired commit** (any strategy) every 5 min, paid by the executor key.
+- **D-057 Alerts** are rows in `AlertLog` (`sentAt` added) delivered to Telegram every 30 s; health checks every 5 min (gas < `MIN_GAS_BALANCE_ETH`, indexer lag > 2 min, tx failure rate > 10% in 15 min) with Redis de-duplication.
+- **D-058 House strategies** are registered by `scripts/register-house.ts` (dry run by default, `--broadcast` sends): Mag7 Rebalance (rebalance, 7 stocks, weekly, 2% drift, 10% share), SPY/QQQ Rotation (20-day, Friday close, 10%), News Desk (AI, NVDA/TSLA/COIN, 20%, modelHash = keccak256(AI_MODEL)).
+- **D-059 Soak on the fork is compressed** (`scripts/soak-fork.ts`, minutes not 48 h, with a forced crash between commit and reveal). The 48 h soak in the launch checklist must run against the deployed stack.

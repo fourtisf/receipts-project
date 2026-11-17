@@ -13,6 +13,7 @@ import { publicRoutes } from './routes/public.js';
 import { wsRoutes } from './routes/ws.js';
 import { authRoutes } from './routes/auth.js';
 import { writeRoutes } from './routes/writes.js';
+import { geoRoutes } from './routes/geo.js';
 
 export interface ServerDeps {
   env: Env;
@@ -119,5 +120,6 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
   await app.register(wsRoutes);
   await app.register(authRoutes);
   await app.register(writeRoutes);
+  await app.register(geoRoutes);
   return app;
 }
