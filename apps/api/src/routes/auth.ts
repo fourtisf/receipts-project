@@ -35,7 +35,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const nonce = generateSiweNonce();
     await prisma.siweNonce.create({ data: { nonce, expiresAt: new Date(Date.now() + NONCE_TTL_MS) } });
     reply.header('Cache-Control', 'no-store');
-    return { nonce };
+    // domain / uri the sign-in message must carry (so clients build exactly what /auth/verify checks)
+    return { nonce, domain: env.APP_DOMAIN, uri: expectedUri(env.APP_DOMAIN, env.NODE_ENV) };
   });
 
   const verifyBody = z.object({

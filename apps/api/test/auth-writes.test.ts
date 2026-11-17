@@ -69,6 +69,8 @@ async function login(): Promise<string> {
 
 describe('SIWE auth', () => {
   it('signs in, reads /auth/me and logs out', async () => {
+    const n = (await app.inject('/auth/nonce')).json();
+    expect(n).toMatchObject({ domain: DOMAIN, uri: `https://${DOMAIN}` });
     const cookie = await login();
     const me = await app.inject({ url: '/auth/me', headers: { cookie } });
     expect(me.json()).toEqual({ address: account.address.toLowerCase() });

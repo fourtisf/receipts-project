@@ -72,8 +72,8 @@ Fork tests (`test/fork/RobinhoodFork.t.sol`) run the full commit → execute →
 Uniswap V3 pools and Chainlink feeds for WETH, cbBTC, NVDA and SPY, check every config address on-chain, and simulate a
 weekend-stale stock feed.
 
-Coverage (legacy pipeline, `forge coverage`): **99.6 % lines, 98.3 % statements, 89.8 % branches, 100 % functions**
-on `src/`.
+Coverage (legacy pipeline, `forge coverage`): **99.6 % lines, 98.0 % statements, 88.4 % branches, 100 % functions**
+on `src/` (124 tests + 7 fork tests).
 
 ### Gas (optimized build, `test/Gas.t.sol`)
 
@@ -95,22 +95,46 @@ Robinhood Chain (Arbitrum Orbit) block gas limit is 32M; NAV loops only price to
 - **Oracles.** Answers ≤ 0, future-dated and stale rounds are rejected. Strict staleness (per token, from config) for
   swaps, fee settlement and `follow`; lenient (`max(maxStaleness, 7 days)`) for the breaker and mark scaling. Feed
   `decimals()` is read live (not cached) so an aggregator change cannot silently misprice.
-- **Withdraw never depends on oracles.** Fee settlement inside `withdraw` is a `try this.settleFeesForWithdraw()`
-  self-call (only callable by the vault). NAV reads never revert (try/catch on feeds, low-level `balanceOf`). If NAV
-  cannot be computed the marks are frozen instead of reverting.
+- **Withdraw never depends on oracles or on any listed token behaving.** Fee settlement inside `withdraw` is a
+  `try this.settleFeesForWithdraw()` self-call (only callable by the vault). NAV reads never revert: feeds and
+  `balanceOf` are low-level, gas-capped static calls (200k / 100k gas), and every value / sum is overflow-checked
+  (`Math.tryMul`, values capped at 2^128 ≈ $3.4e20) — an absurd balance or price is treated as a bad read. Token
+  decimals > 36 are rejected when a vault is created. If NAV cannot be computed the marks are frozen instead of
+  reverting.
 - **Effects before interactions.** `withdraw` predicts `navAfter` from the withdrawn token's value and updates marks
   before the transfer. Fee settlement updates marks before paying.
 - **Reentrancy.** Every state-changing external vault function is `nonReentrant` (owner setters included), so the
   router — or a malicious token — cannot re-enter anything.
 - **Dust.** `executeSignal` reverts if the oracle minimum output rounds to zero (found by the invariant suite).
-- **Token switch.** Disabling / enabling a held token moves the marks like a withdrawal / deposit of its value, so the
-  switch cannot be used to dodge fees or manufacture "profit".
+- **Token switch.** While following, a held token cannot be disabled (`TokenHeld`); the owner withdraws it instead,
+  which settles the creator fee first. Enabling a held token adds its value to the marks like a deposit. When not
+  following, disabling / enabling scales / raises the marks like a withdrawal / deposit (only the owner's own breaker
+  reference is affected; `follow` re-sets the high-water mark).
+- **Strategy switches cannot erase fees.** `follow` (switch) and `unfollow` revert with `FeeUnpaid` when a fee is due
+  but the vault holds too little USDG; `settleFees` / `withdraw` defer instead (`FeeDeferred`).
 - **Creator share.** Fees use `min(snapshot, current share)`; creators can only lower the share.
 - **Factory paging.** `vaults(start, count)` is overflow-safe for any `count` (found by a unit test).
 
 ---
 
-## 4. Slither
+## 4. Independent review
+
+A second, independent adversarial review (fresh context, code + spec only, every finding proven with a Foundry
+test) found **no way for a stolen operator and/or signer key to exceed the bound or move tokens out of a vault**
+(a dedicated test burns the whole daily budget in round trips against a router that delivers exactly the oracle
+minimum: loss = daily limit × slippage). Its findings and what was done:
+
+| # | Severity | Finding | Status |
+|---|---|---|---|
+| F-1 | High | A listed token returning an absurd `balanceOf` (or decimals ≥ 78) made the NAV sum overflow, so `withdraw` and every escape hatch reverted | **Fixed**: overflow-checked NAV, values capped, low-level feed reads, decimals ≤ 36 at vault creation (`ReviewRegression.t.sol` F-1 tests) |
+| F-2 | Medium | Disable/enable round trips of a held token shrank the accrued profit (owner dodges fees) or could overcharge after a loss | **Fixed**: cannot disable a held token while following (`TokenHeld`); withdraw settles fees first |
+| F-3 | Low | `unfollow` / `follow` while a fee was deferred erased the accrued fee | **Fixed**: they revert `FeeUnpaid` instead |
+| F-4 | Low | Anyone can donate 1 wei of a listed token whose feed is dead (> 7 days stale) and block trading until the owner removes it | **Documented** (§5); recovery tested: owner withdraws the dust, `resetMarks`, trading resumes |
+| F-5 | Low | A gas-burning `balanceOf` could make `withdraw` run out of gas while following | **Fixed**: gas caps on token and feed calls (`test_F5_…` withdraws with 3M gas) |
+| F-6 | Low/Info | `withdraw(USDG, fullBalance)` reverts when a fee is due (paid from USDG first) | **Documented**; the UI subtracts the pending fee for "withdraw max" |
+| F-7 | Low/Info | If USDG freezes the creator or treasury, `follow` / `unfollow` revert while profit is pending | **Documented**; withdraw still works |
+
+## 5. Slither
 
 `slither packages/contracts --config-file packages/contracts/slither.config.json` (also in CI, failing on medium+).
 Result: **0 high, 0 medium.** Remaining findings and why they are acceptable:
@@ -128,7 +152,7 @@ Result: **0 high, 0 medium.** Remaining findings and why they are acceptable:
 
 ---
 
-## 5. Known limitations
+## 6. Known limitations
 
 - **Fixed 24 h windows**: up to 2× the daily limit can be swapped around a window boundary.
 - **Oracle deviation lag**: Chainlink updates on deviation (~0.5%) or heartbeat; fills are bounded against a price that
@@ -145,6 +169,16 @@ Result: **0 high, 0 medium.** Remaining findings and why they are acceptable:
 - **Strict prices for `follow` / `unfollow`**: they revert (`PricesStale`) while any held token's feed is stale (e.g.
   stock tokens on weekends). The owner can still pause, revoke the bot and withdraw.
 - **Vault ownership is not transferable**: a lost owner key means locked funds.
+- **Dust of a dead-feed token blocks trading** (review F-4): if a listed feed stops updating for more than 7 days,
+  anyone can send 1 wei of that token to a vault and every `executeSignal` reverts until the owner withdraws the dust
+  (always possible) and calls `resetMarks` (fees accrued before the freeze are forgone). The token list is fixed, so a
+  deprecated feed means deploying a new factory.
+- **Fee payments are push transfers in USDG**: if the creator or treasury address is frozen by the USDG issuer,
+  `follow` / `unfollow` revert while profit is pending (withdraw still works; pause / revoke the bot meanwhile).
+- **"Withdraw max" of USDG** must leave room for a pending creator fee (paid from USDG first inside `withdraw`).
+- **Stock feeds and the oracle-lag term**: stock feeds are 24/5 with a 25 h staleness limit. If a feed misses updates
+  over a market gap, the oracle price can lag the pool by the gap, so the worst case for stock tokens can exceed the
+  ~0.5% lag assumed in §1 (e.g. a 10% overnight gap → up to $2,000 × ~11% per vault per day at the beta cap).
 - **Stock tokens** pause on weekends (feeds stale → swaps revert by design) and are not available to US persons.
 - **Shallow pools** ($20k–$400k): keep trade sizes small; the oracle minimum protects price but large trades will
   simply revert.

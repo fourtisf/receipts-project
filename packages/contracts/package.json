@@ -5,7 +5,7 @@
   "scripts": {
     "build": "forge build",
     "test": "forge test",
-    "coverage": "FOUNDRY_PROFILE=coverage forge coverage --no-match-path 'test/fork/*' --report summary",
+    "coverage": "FOUNDRY_PROFILE=coverage forge coverage --skip 'script/**' --no-match-path 'test/fork/*' --no-match-coverage 'test|script' --report summary",
     "lint": "forge fmt --check",
     "typecheck": "echo 'solidity: compiled by forge build'"
   }

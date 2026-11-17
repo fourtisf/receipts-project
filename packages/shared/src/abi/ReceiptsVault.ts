@@ -1197,6 +1197,22 @@ export const receiptsVaultAbi = [
   },
   {
     "type": "error",
+    "name": "FeeUnpaid",
+    "inputs": [
+      {
+        "name": "neededBase",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "baseBalance",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InsufficientOutput",
     "inputs": [
       {
@@ -1306,6 +1322,17 @@ export const receiptsVaultAbi = [
         "name": "strategyId",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "TokenHeld",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },

@@ -349,3 +349,26 @@ export const wsEventSchema = z.object({
   data: z.record(z.unknown()),
 });
 export type WsEvent = z.infer<typeof wsEventSchema>;
+
+// ───────────────────────── auth + geo (additive, M4)
+
+export const authNonceSchema = z.object({
+  nonce: z.string(),
+  /** SIWE domain / uri the API verifies (clients build the message with exactly these). */
+  domain: z.string().optional(),
+  uri: z.string().optional(),
+});
+export const authMeSchema = z.object({ address: z.string() });
+
+export const geoSchema = z.object({
+  country: z.string().nullable(),
+  stocksBlocked: z.boolean(),
+  notice: z.string(),
+});
+export type Geo = z.infer<typeof geoSchema>;
+
+/** Unsigned transaction returned by creator-only API routes (the creator signs it in the browser). */
+export const txRequestSchema = z.object({
+  tx: z.object({ to: z.string().nullable(), data: z.string() }),
+  metadataURI: z.string().optional(),
+});

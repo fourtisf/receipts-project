@@ -242,6 +242,8 @@ contract ReceiptsVaultTest is Base {
     function test_withdraw_disabledToken_noScaling() public {
         _setupWithWeth(1000, 500);
         vm.prank(owner);
+        vault.unfollow(); // a held token can only be disabled when not following (TokenHeld otherwise)
+        vm.prank(owner);
         vault.setTokenEnabled(address(weth), false);
         uint256 hwm = vault.hwmNav();
         uint256 bal = weth.balanceOf(address(vault));
@@ -397,13 +399,17 @@ contract ReceiptsVaultTest is Base {
 
     function test_setTokenEnabled_movesMarksLikeDepositWithdraw() public {
         _setupWithWeth(1000, 500);
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(ReceiptsVault.TokenHeld.selector, address(weth)));
+        vault.setTokenEnabled(address(weth), false); // while following: withdraw instead (settles fees)
+        vm.prank(owner);
+        vault.unfollow();
         uint256 hwm0 = vault.hwmNav();
         uint256 nav0 = vault.navLenient();
         vm.prank(owner);
         vault.setTokenEnabled(address(weth), false);
         uint256 nav1 = vault.navLenient();
         assertApproxEqRel(vault.hwmNav(), (hwm0 * nav1) / nav0, 1e12);
-        // re-enabling after a price rise must not create fee-able "profit" out of thin air
         vm.prank(owner);
         vault.setTokenEnabled(address(weth), true);
         // disable scales proportionally, enable adds the value: the round trip lands within the swap cost (0.3%)
@@ -413,7 +419,8 @@ contract ReceiptsVaultTest is Base {
     }
 
     function test_setTokenEnabled_disableWithBrokenFeedFreezes() public {
-        _setupWithWeth(1000, 500);
+        _deposit(1000e6);
+        weth.mint(address(vault), 1e18); // not following
         wethFeed.setReverts(true);
         vm.prank(owner);
         vault.setTokenEnabled(address(weth), false);

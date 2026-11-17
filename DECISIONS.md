@@ -23,7 +23,7 @@ Decisions made while building, with the reason. Newest at the bottom of each sec
 - **D-012 NAV and prices never revert internally.** `_nav` / `_readPrice` return a status (try/catch on feeds, low-level `balanceOf`), so `withdraw` cannot be bricked by any feed or token; the external views `navStrict()` / `navLenient()` / `priceUsd()` revert with the precise error (`StaleOraclePrice(token)` / `BadOraclePrice(token)`).
 - **D-013 Feed `decimals()` is read live**, not cached, at the cost of one extra call per held token (safety over gas).
 - **D-014 Lenient staleness = `max(token.maxStaleness, 7 days)`.**
-- **D-015 Base token (USDG) cannot be disabled**; every other listed token can. Disabling / enabling a held token scales / raises the marks like a withdrawal / deposit of its value (prevents fee dodging or fake profit via the switch).
+- **D-015 Base token (USDG) cannot be disabled**; every other listed token can. *Revised after the independent review (F-2):* while following, a held token cannot be disabled (`TokenHeld`) — withdraw it instead, which settles fees first; enabling adds the value like a deposit. Not following: disable/enable scale/raise the marks like a withdrawal/deposit.
 - **D-016 Fees use `min(creatorShareSnapshot, current share)`.** Creators can only lower shares, so followers automatically benefit from a lowered share without re-following. Still within invariant 10.
 - **D-017 Withdraw updates marks before the transfer** (predicted `navAfter = navBefore − value(withdrawn)`), i.e. checks-effects-interactions, instead of measuring NAV after the transfer.
 - **D-018 `follow` while marks are frozen re-arms them** (`peak = hwm = navStrict`, emits `MarksReset`); `unfollow` / `follow` skip fee settlement while frozen (fees accrued before the freeze are forgone, documented).
@@ -86,3 +86,9 @@ Decisions made while building, with the reason. Newest at the bottom of each sec
 - **D-057 Alerts** are rows in `AlertLog` (`sentAt` added) delivered to Telegram every 30 s; health checks every 5 min (gas < `MIN_GAS_BALANCE_ETH`, indexer lag > 2 min, tx failure rate > 10% in 15 min) with Redis de-duplication.
 - **D-058 House strategies** are registered by `scripts/register-house.ts` (dry run by default, `--broadcast` sends): Mag7 Rebalance (rebalance, 7 stocks, weekly, 2% drift, 10% share), SPY/QQQ Rotation (20-day, Friday close, 10%), News Desk (AI, NVDA/TSLA/COIN, 20%, modelHash = keccak256(AI_MODEL)).
 - **D-059 Soak on the fork is compressed** (`scripts/soak-fork.ts`, minutes not 48 h, with a forced crash between commit and reveal). The 48 h soak in the launch checklist must run against the deployed stack.
+
+## Post-review hardening (independent adversarial review)
+
+- **D-066 NAV is overflow-safe and gas-capped** (F-1, F-5): values via `Math.tryMul`, any value or NAV above 2^128 is a bad read; feed and `balanceOf` reads are low-level static calls with gas caps (200k / 100k) and no ABI validation that could throw; decimals > 36 rejected at vault creation.
+- **D-067 `follow` / `unfollow` revert `FeeUnpaid`** when a due fee cannot be paid in USDG (F-3); `settleFees` / `withdraw` keep deferring.
+- **D-068 Accepted and documented**: dead-feed dust griefing (F-4, owner recovery tested), push-payment fees vs a frozen creator (F-7), "withdraw max" must leave room for a pending fee (F-6, handled in the UI), stock-feed gaps can exceed the 0.5% lag assumption.

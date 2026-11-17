@@ -83,7 +83,7 @@ jobs:
       - name: Gas snapshot
         run: forge snapshot --no-match-path 'test/{fork,invariant}/*' --no-match-test 'testFuzz' --check --tolerance 5
       - name: Coverage
-        run: FOUNDRY_PROFILE=coverage forge coverage --no-match-path 'test/fork/*' --no-match-coverage 'test|script' --report summary
+        run: FOUNDRY_PROFILE=coverage forge coverage --skip 'script/**' --no-match-path 'test/fork/*' --no-match-coverage 'test|script' --report summary
 
   slither:
     name: slither

@@ -71,6 +71,12 @@ contract ReceiptsVault is IReceiptsVault, ReentrancyGuard {
     uint256 public constant LENIENT_STALENESS = 7 days;
     uint256 private constant BPS = 10_000;
 
+    /// @dev Any single value or NAV above this (≈ $3.4e20) is treated as a bad read instead of risking overflow.
+    uint256 private constant MAX_VALUE = type(uint128).max;
+    /// @dev Gas caps for calls into listed tokens / feeds so a misbehaving one cannot starve withdraw.
+    uint256 private constant BALANCE_GAS = 100_000;
+    uint256 private constant FEED_GAS = 200_000;
+
     uint8 private constant PRICE_OK = 0;
     uint8 private constant PRICE_BAD = 1;
     uint8 private constant PRICE_STALE = 2;
@@ -110,6 +116,8 @@ contract ReceiptsVault is IReceiptsVault, ReentrancyGuard {
     error SameToken();
     error BadConfig();
     error OnlySelf();
+    error TokenHeld(address token);
+    error FeeUnpaid(uint256 neededBase, uint256 baseBalance);
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -166,10 +174,12 @@ contract ReceiptsVault is IReceiptsVault, ReentrancyGuard {
         if (tokenConfig[t].listed) revert BadConfig();
         isBase = t == base_;
         if (isBase != (tier == 0)) revert BadConfig(); // only the base token has tier 0
+        uint8 dec = IERC20Metadata(t).decimals();
+        if (dec > 36) revert BadConfig();
         tokenConfig[t] = TokenConfig({
             listed: true,
             enabled: true,
-            decimals: IERC20Metadata(t).decimals(),
+            decimals: dec,
             feeTier: tier,
             maxStaleness: maxStaleness,
             feed: AggregatorV3Interface(feed)
@@ -219,7 +229,7 @@ contract ReceiptsVault is IReceiptsVault, ReentrancyGuard {
             if (ok && c.enabled) {
                 (uint8 ps, uint256 p) = _readPrice(c, _lenientAge(c));
                 ok = ps == PRICE_OK;
-                if (ok) valueOut = Math.mulDiv(amount, p, 10 ** c.decimals);
+                if (ok) (ok, valueOut) = _value(amount, p, c.decimals);
             }
             if (ok) {
                 if (navBefore > 0) {
@@ -240,7 +250,7 @@ contract ReceiptsVault is IReceiptsVault, ReentrancyGuard {
     /// @notice Internal entry point for best-effort fee settlement inside `withdraw`. Only callable by the vault.
     function settleFeesForWithdraw() external {
         if (msg.sender != address(this)) revert OnlySelf();
-        _settleFees();
+        _settleFees(false);
     }
 
     /// @inheritdoc IReceiptsVault
@@ -249,7 +259,8 @@ contract ReceiptsVault is IReceiptsVault, ReentrancyGuard {
         if (!reg.isActive(strategyId)) revert StrategyInactive(strategyId);
 
         uint256 previous = followingId;
-        if (previous != 0 && !marksFrozen) _settleFees(); // strict: reverts PricesStale (owner can retry or withdraw)
+        // strict: reverts PricesStale, or FeeUnpaid when the fee cannot be paid in USDG (owner can deposit or withdraw)
+        if (previous != 0 && !marksFrozen) _settleFees(true);
 
         (uint8 st,, uint256 nav,) = _nav(false);
         if (st != PRICE_OK) revert PricesStale();
@@ -274,7 +285,8 @@ contract ReceiptsVault is IReceiptsVault, ReentrancyGuard {
     function unfollow() external onlyOwner nonReentrant {
         uint256 id = followingId;
         if (id == 0) revert NotFollowing();
-        if (!marksFrozen) _settleFees(); // strict: reverts PricesStale (owner can pause / revoke and retry later)
+        // strict: reverts PricesStale / FeeUnpaid (owner can pause, revoke, deposit USDG or withdraw, then retry)
+        if (!marksFrozen) _settleFees(true);
         followingId = 0;
         creatorShareSnapshot = 0;
         emit Unfollowed(id);
@@ -310,24 +322,28 @@ contract ReceiptsVault is IReceiptsVault, ReentrancyGuard {
 
     /// @inheritdoc IReceiptsVault
     /// @dev Only factory-listed tokens; the base token cannot be disabled. A token's balance enters / leaves NAV with
-    ///      the switch, so the marks move like a deposit / withdrawal of that value (no fee games via the switch).
+    ///      the switch, so the marks move like a deposit / withdrawal of that value. While following, a token the vault
+    ///      holds cannot be disabled (TokenHeld): withdraw it instead, which settles fees first — so the switch can
+    ///      neither dodge creator fees nor manufacture profit.
     function setTokenEnabled(address token, bool enabled) external onlyOwner nonReentrant {
         TokenConfig storage c = tokenConfig[token];
         if (!c.listed || (token == base && !enabled)) revert TokenNotAllowed(token);
         if (c.enabled != enabled) {
             (bool bok, uint256 bal) = _balanceOf(token);
+            if (!enabled && followingId != 0 && (!bok || bal > 0)) revert TokenHeld(token);
             if (bok && bal > 0) {
                 TokenConfig memory cm = c;
                 if (enabled) {
-                    uint256 value = Math.mulDiv(bal, _priceOrRevert(token, cm, _lenientAge(cm)), 10 ** cm.decimals);
+                    (bool vok, uint256 value) = _value(bal, _priceOrRevert(token, cm, _lenientAge(cm)), cm.decimals);
+                    if (!vok) revert BadOraclePrice(token);
                     peakNav += value;
                     hwmNav += value;
                 } else if (!marksFrozen) {
                     (uint8 st,, uint256 navBefore,) = _nav(true);
                     (uint8 ps, uint256 p) = _readPrice(cm, _lenientAge(cm));
-                    if (st == PRICE_OK && ps == PRICE_OK) {
+                    (bool vok, uint256 value) = ps == PRICE_OK ? _value(bal, p, cm.decimals) : (false, 0);
+                    if (st == PRICE_OK && vok) {
                         if (navBefore > 0) {
-                            uint256 value = Math.mulDiv(bal, p, 10 ** cm.decimals);
                             uint256 navAfter = value >= navBefore ? 0 : navBefore - value;
                             peakNav = Math.mulDiv(peakNav, navAfter, navBefore);
                             hwmNav = Math.mulDiv(hwmNav, navAfter, navBefore);
@@ -506,7 +522,7 @@ contract ReceiptsVault is IReceiptsVault, ReentrancyGuard {
         if (followingId == 0) revert NotFollowing();
         if (marksFrozen) revert MarksAreFrozen();
         if (block.timestamp < lastFeeSettle + FEE_PERIOD) revert TooSoon();
-        _settleFees();
+        _settleFees(false);
     }
 
     // ================================================================== views
@@ -591,7 +607,9 @@ contract ReceiptsVault is IReceiptsVault, ReentrancyGuard {
     }
 
     /// @dev Strict fee settlement (CONTRACTS.md §3.6). Reverts PricesStale when strict prices are unavailable.
-    function _settleFees() internal {
+    /// @param mustPay true for follow / unfollow: a fee that cannot be paid in USDG reverts (FeeUnpaid) instead of being
+    ///        deferred, so switching strategies cannot erase an accrued fee. settleFees / withdraw defer (FeeDeferred).
+    function _settleFees(bool mustPay) internal {
         uint256 id = followingId;
         (uint8 st,, uint256 nav,) = _nav(false);
         if (st != PRICE_OK) revert PricesStale();
@@ -604,6 +622,7 @@ contract ReceiptsVault is IReceiptsVault, ReentrancyGuard {
 
         uint256 bal = IERC20(base).balanceOf(address(this));
         if (totalBase > bal) {
+            if (mustPay) revert FeeUnpaid(totalBase, bal);
             emit FeeDeferred(profit, totalBase, bal);
             return;
         }
@@ -677,30 +696,47 @@ contract ReceiptsVault is IReceiptsVault, ReentrancyGuard {
             if (bal == 0) continue;
             (uint8 ps, uint256 p) = _readPrice(c, lenient ? _lenientAge(c) : c.maxStaleness);
             if (ps != PRICE_OK) return (ps, t, 0, 0);
-            uint256 v = Math.mulDiv(bal, p, 10 ** c.decimals);
-            nav += v;
+            (bool vok, uint256 v) = _value(bal, p, c.decimals);
+            if (!vok) return (PRICE_BAD, t, 0, 0);
+            nav += v; // ≤ 20 tokens × MAX_VALUE: cannot overflow
+            if (nav > MAX_VALUE) return (PRICE_BAD, t, 0, 0);
             if (t == base) baseValue = v;
         }
     }
 
-    /// @dev Chainlink read that never reverts. Rejects answer ≤ 0, future-dated and stale rounds.
+    /// @dev balance × price / 10^decimals without ever reverting; false on overflow or absurd values.
+    function _value(uint256 amount, uint256 price18, uint8 decimals) internal pure returns (bool ok, uint256 v) {
+        uint256 prod;
+        (ok, prod) = Math.tryMul(amount, price18);
+        if (!ok) return (false, 0);
+        v = prod / 10 ** decimals; // decimals ≤ 36 (checked at listing)
+        if (v > MAX_VALUE) return (false, 0);
+    }
+
+    /// @dev Chainlink read that never reverts (low-level, gas-capped, no ABI validation that could throw).
+    ///      Rejects answer ≤ 0, future-dated and stale rounds, decimals > 36 and absurd prices.
     function _readPrice(TokenConfig memory c, uint256 maxAge) internal view returns (uint8 status, uint256 price18) {
+        (bool ok, bytes memory data) = address(c.feed).staticcall{gas: FEED_GAS}(
+            abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector)
+        );
+        if (!ok || data.length < 160) return (PRICE_BAD, 0);
         // roundId / startedAt / answeredInRound are not needed (answeredInRound is deprecated by Chainlink).
-        // slither-disable-next-line unused-return
-        try c.feed.latestRoundData() returns (uint80, int256 answer, uint256, uint256 updatedAt, uint80) {
-            if (answer <= 0) return (PRICE_BAD, 0);
-            if (updatedAt > block.timestamp || block.timestamp - updatedAt > maxAge) return (PRICE_STALE, 0);
-            try c.feed.decimals() returns (uint8 d) {
-                if (d > 36) return (PRICE_BAD, 0);
-                price18 = d <= 18 ? uint256(answer) * 10 ** (18 - d) : uint256(answer) / 10 ** (d - 18);
-                if (price18 == 0) return (PRICE_BAD, 0);
-                return (PRICE_OK, price18);
-            } catch {
-                return (PRICE_BAD, 0);
-            }
-        } catch {
-            return (PRICE_BAD, 0);
+        (, int256 answer,, uint256 updatedAt,) = abi.decode(data, (uint256, int256, uint256, uint256, uint256));
+        if (answer <= 0) return (PRICE_BAD, 0);
+        if (updatedAt > block.timestamp || block.timestamp - updatedAt > maxAge) return (PRICE_STALE, 0);
+        (ok, data) =
+            address(c.feed).staticcall{gas: FEED_GAS}(abi.encodeWithSelector(AggregatorV3Interface.decimals.selector));
+        if (!ok || data.length < 32) return (PRICE_BAD, 0);
+        uint256 d = abi.decode(data, (uint256));
+        if (d > 36) return (PRICE_BAD, 0);
+        if (d <= 18) {
+            (ok, price18) = Math.tryMul(uint256(answer), 10 ** (18 - d));
+            if (!ok) return (PRICE_BAD, 0);
+        } else {
+            price18 = uint256(answer) / 10 ** (d - 18);
         }
+        if (price18 == 0 || price18 > MAX_VALUE) return (PRICE_BAD, 0);
+        return (PRICE_OK, price18);
     }
 
     function _priceOrRevert(address token, TokenConfig memory c, uint256 maxAge) internal view returns (uint256 p) {
@@ -717,7 +753,7 @@ contract ReceiptsVault is IReceiptsVault, ReentrancyGuard {
     /// @dev balanceOf that never reverts (withdraw must work even if one listed token misbehaves).
     function _balanceOf(address token) internal view returns (bool ok, uint256 bal) {
         (bool success, bytes memory data) =
-            token.staticcall(abi.encodeWithSelector(IERC20.balanceOf.selector, address(this)));
+            token.staticcall{gas: BALANCE_GAS}(abi.encodeWithSelector(IERC20.balanceOf.selector, address(this)));
         if (!success || data.length < 32) return (false, 0);
         return (true, abi.decode(data, (uint256)));
     }
