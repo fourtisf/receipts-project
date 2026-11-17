@@ -33,3 +33,6 @@ packages/contracts/deployments/inv-*.txt
 dump.rdb
 # forge broadcast logs (fork runs also report chain 4663); the deployment record is deployments/<chainId>.json
 packages/contracts/broadcast/
+
+# web build outputs used by e2e
+.next-e2e/
