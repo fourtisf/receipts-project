@@ -8,6 +8,7 @@ import type { Redis } from 'ioredis';
 import type { PrismaClient } from '@receipts/db';
 import type { Env } from './env.js';
 import type { ChainReader } from './chain.js';
+import type { Reporter } from '@receipts/shared';
 import { ApiError } from './lib/http.js';
 import { publicRoutes } from './routes/public.js';
 import { wsRoutes } from './routes/ws.js';
@@ -20,6 +21,7 @@ export interface ServerDeps {
   prisma: PrismaClient;
   redis?: Redis;
   chain?: ChainReader;
+  reporter?: Reporter;
 }
 
 declare module 'fastify' {
@@ -74,7 +76,10 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       return reply.status(err.statusCode).send({ error: { code: err.code, message: err.message } });
     }
     const status = err.statusCode && err.statusCode >= 400 ? err.statusCode : 500;
-    if (status >= 500) req.log.error(err);
+    if (status >= 500) {
+      req.log.error(err);
+      void deps.reporter?.capture(err, { method: req.method, url: req.url.split('?')[0] });
+    }
     const code =
       status === 429
         ? 'RATE_LIMITED'

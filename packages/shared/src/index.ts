@@ -3,3 +3,4 @@ export * from './receipt.js';
 export * from './money.js';
 export * from './api.js';
 export * from './metadata.js';
+export * from './report.js';

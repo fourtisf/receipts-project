@@ -77,3 +77,24 @@ describe('chain config', () => {
     for (const t of TOKENS) if (t.symbol !== 'USDG') expect([100, 500, 3000, 10000]).toContain(t.feeTier);
   });
 });
+
+describe('error reporter', () => {
+  it('is a no-op without a DSN and scrubs secrets when enabled', async () => {
+    const { makeReporter } = await import('./report.js');
+    expect(makeReporter({ service: 'api' }).enabled).toBe(false);
+    const calls: { url: string; body: string }[] = [];
+    const r = makeReporter({
+      dsn: 'https://abc@o1.ingest.sentry.io/42',
+      service: 'worker',
+      fetchImpl: (async (url: string, init: { body: string }) => {
+        calls.push({ url, body: init.body });
+        return new Response('{}');
+      }) as unknown as typeof fetch,
+    });
+    await r.capture(new Error('boom'), { privateKey: '0xdead', strategyId: 3 });
+    expect(calls[0]!.url).toBe('https://o1.ingest.sentry.io/api/42/envelope/');
+    expect(calls[0]!.body).toContain('boom');
+    expect(calls[0]!.body).toContain('[redacted]');
+    expect(calls[0]!.body).not.toContain('0xdead');
+  });
+});

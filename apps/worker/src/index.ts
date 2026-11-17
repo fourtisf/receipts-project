@@ -9,6 +9,7 @@ import { Indexer } from './indexer/indexer.js';
 import { runPrices } from './jobs/prices.js';
 import { runStats } from './jobs/stats.js';
 import { startPipeline } from './pipeline/index.js';
+import { makeReporter } from '@receipts/shared';
 
 const env = loadEnv();
 const prisma = getPrisma();
@@ -16,6 +17,11 @@ const redis = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
 const connection = { url: env.REDIS_URL } as ConnectionOptions;
 const client = makePublicClient(env);
 const publisher = new Publisher(redis);
+const reporter = makeReporter({ dsn: process.env.SENTRY_DSN, service: 'worker', environment: env.NODE_ENV });
+process.on('unhandledRejection', (err) => {
+  log.error({ err: String(err) }, 'unhandled rejection');
+  void reporter.capture(err);
+});
 
 let stopping = false;
 const stops: (() => Promise<void>)[] = [];
@@ -69,6 +75,7 @@ if (on(env.RUN_INDEXER)) {
           await sleep(r && r.to < r.head - BigInt(env.CONFIRMATIONS) ? 50 : env.INDEXER_POLL_MS);
         } catch (err) {
           log.error({ err: String(err) }, 'indexer tick failed');
+          void reporter.capture(err, { job: 'indexer' });
           backoff = Math.min(backoff * 2, 60_000);
           await sleep(backoff);
         }
@@ -92,7 +99,10 @@ function schedule(name: string, everyMs: number, fn: () => Promise<unknown>): vo
     },
     { connection, concurrency: 1 },
   );
-  worker.on('failed', (_job, err) => log.error({ job: name, err: String(err) }, 'job failed'));
+  worker.on('failed', (_job, err) => {
+    log.error({ job: name, err: String(err) }, 'job failed');
+    void reporter.capture(err, { job: name });
+  });
   stops.push(async () => {
     await worker.close();
     await queue.close();
