@@ -20,7 +20,7 @@ const config: Config = {
         ai: { DEFAULT: '#3538CD', bg: '#EEF4FF' },
       },
       fontFamily: {
-        sans: ['"Plus Jakarta Sans Variable"', '"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-jakarta)', '"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
         mono: ['var(--font-geist-mono)', '"Geist Mono"', 'ui-monospace', 'monospace'],
       },
       borderRadius: {

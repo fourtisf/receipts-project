@@ -46,9 +46,16 @@ Done
 
 Next: M3 web (read-only).
 
-## Work in progress (committed ahead, accepted per milestone)
+## M3 — Web (read-only) ✅
 
-- M3 web (read-only) is being built in `apps/web` (not committed yet).
+Done
+- Landing (`/`): nav, hero with live stats, product preview (browser frame + floating vault card + receipt), built-on, features, how-it-works (steps highlight receipt lines), security list + worst-case calculator, comparison, FAQ, final CTA, footer with contract addresses from `/config/chain` and "Not investment advice". ISR every 10 s.
+- App: `/app` strategies (KPIs, category segmented control, sort, table → cards < 800 px), `/app/s/[id]` (KPIs, SVG equity chart vs hold, recent receipt slips, copy panel, on-chain facts with Blockscout links), `/app/s/[id]/receipt/[nonce]` permalink (full slip + stamp + checks + executions), `/app/verify` (API fast path, says so), `/app/vault` (connected wallet's vault or empty state, house vaults). Sidebar with live block; mobile top bar.
+- wagmi v2 + RainbowKit with the Robinhood Chain object from `/config/chain` (connect only; injected wallets when no WalletConnect id). Live updates over `/api/ws`. OG images for landing, strategy, receipt.
+- No fake data: every number from the API or a chain read; honest empty states. `scripts/seed-dev.ts` (DEV ONLY) seeds a local DB for visual work.
+- **Acceptance**: Playwright screenshots vs the prototype at 1360 px and 390 px match section-for-section (differences only where real data differs); no horizontal scroll at 360 / 390 / 1360 px. Lighthouse (production build) landing: **98 performance / 96 accessibility** mobile, 100 / 96 desktop (the only a11y finding is the prototype's own `faint` grey contrast, kept as designed). `pnpm --filter web lint/typecheck/build` clean; Playwright smoke 16/16 (desktop + mobile).
+- API: client IP from the local Nginx hop only (`TRUST_PROXY=loopback`, not spoofable); Next.js SSR on loopback is exempt from the per-IP rate limit.
+
 - M4 API side done: SIWE (`/auth/nonce|verify|me|logout`), `POST /backtest`, `POST /strategies`, `PATCH /strategies/:id`, `POST /strategies/:id/deactivate`, `GET /geo` — 24 API tests.
 - M5 pipeline done: strategy templates + backtester + AI helpers (`packages/strategies`, 18 tests); worker runner / executor (commit → execute → reveal, crash recovery) / missed-marker / alerts (23 worker tests). Fork soak (`scripts/soak-fork.ts`): 0 missed reveals, 0 mismatches, crash recovered.
 - M6 tooling: `pnpm check-config` (all 13 tokens verified on-chain via the fork), `pnpm verify-deployment`, `scripts/register-house.ts` (dry run by default), updated `deploy/env.example` and `deploy/DEPLOY.md`.

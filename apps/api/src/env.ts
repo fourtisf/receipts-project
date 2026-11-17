@@ -37,10 +37,14 @@ const EnvSchema = z.object({
   TEMPLATE_REVEAL_WINDOW_SEC: z.coerce.number().int().default(3600),
   GEOBLOCK_STOCKS: z.string().default('US'),
   CORS_ORIGINS: z.string().default(''),
+  /**
+   * Which proxy hops to trust for the client IP. Default 'loopback': only the local Nginx, so a client cannot spoof
+   * X-Forwarded-For (proxy-addr walks from the right). 'true' trusts every hop (only behind a trusted chain).
+   */
   TRUST_PROXY: z
     .string()
-    .default('true')
-    .transform((v) => v === 'true' || v === '1'),
+    .default('loopback')
+    .transform((v): boolean | string => (v === 'true' ? true : v === 'false' ? false : v)),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

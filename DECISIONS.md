@@ -55,6 +55,15 @@ Decisions made while building, with the reason. Newest at the bottom of each sec
 - **D-041 Fill price and oracle price on receipts** (`fillPriceUsd`, `oraclePriceUsd`, `slippageBps`) to render the prototype's receipt lines.
 - **D-042 Tests use a fresh Postgres schema per file** (`@receipts/db/testing`, non-destructive `migrate deploy`, dropped afterwards); `prisma migrate reset` is never used by tooling.
 
+## M3 — web (read-only)
+
+- **D-060 Server components fetch the API directly** (`API_INTERNAL_URL`), client components call `/api/*`; every response is parsed with the shared zod schemas. Landing uses ISR (`revalidate = 10`), app pages render on demand.
+- **D-061 Fonts via `next/font/local`** from the npm fontsource / geist files (preloaded, no layout shift, no Google Fonts at build time).
+- **D-062 Webpack `IgnorePlugin` for optional wallet-SDK peers** (`@x402/*`, `@react-native-async-storage/async-storage`) that are referenced but never executed in the browser build.
+- **D-063 Prototype colours kept as designed** even where Lighthouse flags the `faint` grey contrast (96 accessibility); changing the palette is a design decision for the owner.
+- **D-064 Optional links come from env** (`NEXT_PUBLIC_DOCS_URL`, social / verify links); without them the nav "Docs" points to "How it works".
+- **D-065 API proxy trust = `loopback`** (only the local Nginx hop) so `X-Forwarded-For` cannot be spoofed; direct loopback requests without that header (Next.js SSR) are exempt from the per-IP rate limit.
+
 ## M4 — web writes (API side)
 
 - **D-043 SIWE via `viem/siwe`** (no `siwe`/ethers dependency). Nonce single-use and 10-minute expiry, claimed atomically (`updateMany … usedAt: null`). Domain must equal `APP_DOMAIN`, chain 4663, URI `https://APP_DOMAIN` (`http://localhost…` only outside production). EOA signatures verified locally; EIP-1271 smart wallets via an on-chain check. Session cookie `sid`: httpOnly, SameSite=Lax, Secure in production, signed with `SESSION_SECRET`, 7 days.

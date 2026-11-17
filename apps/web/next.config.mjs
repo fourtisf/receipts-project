@@ -11,9 +11,16 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ['@receipts/shared', 'geist'],
-  webpack: (config) => {
+  webpack: (config, { webpack }) => {
     // wagmi/walletconnect optional deps that are not used in the browser bundle
     config.externals.push('pino-pretty', 'lokijs', 'encoding');
+    // Optional deps of wallet SDKs that are never used here: @wagmi/connectors → @base-org/account →
+    // @coinbase/cdp-sdk references x402 payment packages, and @metamask/sdk references React Native storage.
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /^(@x402\/.*|@react-native-async-storage\/async-storage)$/,
+      }),
+    );
     return config;
   },
   async rewrites() {

@@ -62,6 +62,9 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
     timeWindow: '1 minute',
     redis: deps.redis,
     keyGenerator: (req) => req.ip,
+    // Server-side rendering in Next.js calls the API directly on loopback (no X-Forwarded-For). Requests through
+    // Nginx carry the real client IP (TRUST_PROXY=loopback), so this cannot be spoofed by browsers.
+    allowList: (req) => !req.headers['x-forwarded-for'] && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.ip),
   });
   await app.register(websocket);
 
