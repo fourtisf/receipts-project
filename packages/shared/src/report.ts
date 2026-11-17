@@ -50,7 +50,9 @@ export function makeReporter(opts: ReporterOptions): Reporter {
         release: opts.release,
         tags: { service: opts.service },
         exception: {
-          values: [{ type: e.name, value: e.message.slice(0, 2000), stacktrace: { frames: frames(e.stack) } }],
+          values: [
+            { type: e.name, value: e.message.slice(0, 2000), stacktrace: { frames: frames(e.stack) } },
+          ],
         },
         extra: scrub(extra ?? {}),
       };
@@ -78,7 +80,9 @@ function frames(stack?: string): { filename: string; function: string; lineno?: 
     .slice(1, 30)
     .map((l) => {
       const mm = /at (?:(.+?) )?\(?(.+?):(\d+):\d+\)?$/.exec(l.trim());
-      return mm ? { function: mm[1] ?? '?', filename: mm[2]!, lineno: Number(mm[3]) } : { function: l.trim(), filename: '?' };
+      return mm
+        ? { function: mm[1] ?? '?', filename: mm[2]!, lineno: Number(mm[3]) }
+        : { function: l.trim(), filename: '?' };
     })
     .reverse(); // Sentry expects the innermost frame last
 }
