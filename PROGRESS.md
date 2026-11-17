@@ -56,9 +56,36 @@ Done
 - **Acceptance**: Playwright screenshots vs the prototype at 1360 px and 390 px match section-for-section (differences only where real data differs); no horizontal scroll at 360 / 390 / 1360 px. Lighthouse (production build) landing: **98 performance / 96 accessibility** mobile, 100 / 96 desktop (the only a11y finding is the prototype's own `faint` grey contrast, kept as designed). `pnpm --filter web lint/typecheck/build` clean; Playwright smoke 16/16 (desktop + mobile).
 - API: client IP from the local Nginx hop only (`TRUST_PROXY=loopback`, not spoofable); Next.js SSR on loopback is exempt from the per-IP rate limit.
 
-- M4 API side done: SIWE (`/auth/nonce|verify|me|logout`), `POST /backtest`, `POST /strategies`, `PATCH /strategies/:id`, `POST /strategies/:id/deactivate`, `GET /geo` — 24 API tests.
-- M5 pipeline done: strategy templates + backtester + AI helpers (`packages/strategies`, 18 tests); worker runner / executor (commit → execute → reveal, crash recovery) / missed-marker / alerts (23 worker tests). Fork soak (`scripts/soak-fork.ts`): 0 missed reveals, 0 mismatches, crash recovered.
-- M6 tooling: `pnpm check-config` (all 13 tokens verified on-chain via the fork), `pnpm verify-deployment`, `scripts/register-house.ts` (dry run by default), updated `deploy/env.example` and `deploy/DEPLOY.md`.
+## M4 — Web (write) ✅
 
-Known issues
-- Public dRPC rate-limits (429). Use a local anvil fork (pinned block) for development; a paid RPC key for production / CI fork tests (`RPC_URL` secret).
+Done
+- SIWE sign-in (RainbowKit authentication adapter → `/api/auth/*`, "no gas"), session-aware wallet button.
+- Vault: create (limits + asset chips), dashboard from chain reads (Multicall3): NAV, holdings, status, daily-limit meter, drawdown vs peak, worst case for the user's own limits; deposit (approve + deposit), withdraw per token (never disabled; "Max" keeps back a pending creator fee), follow / switch / stop / allocation, limits, pause / resume, revoke / restore bot, reset peak / marks; activity log; review changes handled (`TokenHeld`, `FeeUnpaid` decoded with amounts).
+- Copy panel on strategy pages; US stock-token notice + geoblock via `/api/geo`.
+- `/app/create`: template params from `/templates`, debounced backtest preview, `POST /strategies`, user signs `registerStrategy`, link once indexed.
+- Client-side receipt verification (verify page + permalink): `commitOf`, `Revealed` log → `hashSignal` recomputed in the browser, genuine-vault `Executed` logs (later block, min-out, pair/direction); states the source and falls back to the API.
+- Toasts, plain-language error decoding, `/docs` (commit-reveal, threat model, worst-case math, fees, verify-it-yourself), `/terms` + `/privacy` (templates marked for legal review), browser error reporting (`NEXT_PUBLIC_SENTRY_DSN`).
+- API: SIWE (`/auth/nonce|verify|me|session|logout`), `POST /backtest`, `POST /strategies`, `PATCH /strategies/:id`, `POST /strategies/:id/deactivate`, `GET /geo` — 24 API tests.
+- **Acceptance**: `pnpm --filter web e2e:fork` — on a fresh anvil fork, a fresh wallet connects, signs in, creates a vault, deposits, copies a strategy, pauses, revokes the bot and **withdraws successfully while paused and revoked** (on-chain asserts: `paused`, `operator == 0`, exact USDG back). Passed in my own run (157 s). Smoke e2e 24/24; lint / typecheck / build clean.
+
+## M5 — Worker (runner / executor / revealer) ✅
+
+Done
+- `packages/strategies`: 7 rule-based templates + AI news helpers, backtester (720 h, 0.1 % cost, no look-ahead), market data (Coinbase / Binance / Polygon / Alpaca, Chainlink fallback) — 18 tests.
+- Worker pipeline: runner (public paper portfolio, schedules, NYSE hours, committed-model check for AI), executor (encrypted salt stored before commit, local vs on-chain `hashSignal`, per-vault sizing + simulation, back-to-back executions, reveal with deadline alerts, crash recovery), missed-marker for any strategy, Telegram alerts + health checks — 23 worker tests.
+- House strategies: `scripts/register-house.ts` (dry run by default).
+- **Acceptance (compressed)**: `scripts/soak-fork.ts` on the fork — 15–28 signals per run, **0 missed reveals, 0 executions outside their commit window, 0 mismatches**, a forced crash between commit and reveal recovered and revealed. The 48 h soak must run on the deployed stack (needs keys + funded gas); CI runs a 3-min soak when `RPC_URL` is set.
+
+## M6 — Deploy readiness ✅ (mainnet deploy waits for the owner)
+
+Done
+- `deploy/`: PM2 (`ecosystem.config.cjs`), Nginx, `deploy.sh`, `env.example` (every variable documented, REQUIRED marked), `DEPLOY.md` rewritten for this codebase (contracts from a local machine → server → app → Nginx/SSL → house strategies → monitoring → launch order).
+- `pnpm check-config` (all 13 tokens, feeds, pools verified against chain state), `pnpm verify-deployment` (bytecode vs repo), `packages/contracts/script/Deploy.s.sol` + `script/verify.sh` (Blockscout).
+- Independent adversarial review of the contracts; all High / Medium findings fixed (SECURITY.md §4).
+- Monitoring: Sentry reporting (api / worker / web), `/api/health` for uptime, Telegram alerts.
+- `LAUNCH_CHECKLIST.md`: status of HANDOFF §11 — remaining items need the owner (mainnet deploy, funding house vaults, legal review, monitoring accounts).
+
+Known issues / notes
+- The free public RPC (robinhood.drpc.org) rate-limits and only serves very recent state; use a paid archive RPC for production, CI fork tests and the 48 h soak.
+- Backtests need exchange / market-data APIs reachable from the server (blocked in this build sandbox; the API falls back to Chainlink rounds and says so).
+- Lighthouse accessibility 96: the prototype's light grey (`faint`) fails contrast; kept as designed pending your call.

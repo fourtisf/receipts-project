@@ -92,3 +92,11 @@ Decisions made while building, with the reason. Newest at the bottom of each sec
 - **D-066 NAV is overflow-safe and gas-capped** (F-1, F-5): values via `Math.tryMul`, any value or NAV above 2^128 is a bad read; feed and `balanceOf` reads are low-level static calls with gas caps (200k / 100k) and no ABI validation that could throw; decimals > 36 rejected at vault creation.
 - **D-067 `follow` / `unfollow` revert `FeeUnpaid`** when a due fee cannot be paid in USDG (F-3); `settleFees` / `withdraw` keep deferring.
 - **D-068 Accepted and documented**: dead-feed dust griefing (F-4, owner recovery tested), push-payment fees vs a frozen creator (F-7), "withdraw max" must leave room for a pending fee (F-6, handled in the UI), stock-feed gaps can exceed the 0.5% lag assumption.
+
+## M4 — web writes (web side)
+
+- **D-069 `GET /auth/nonce` also returns `{ domain, uri }`** — the exact values `/auth/verify` checks — so the browser never builds a SIWE message the API will reject. **`GET /auth/session`** answers 200 with `{ address | null }` (no 401 console noise on every page).
+- **D-070 Browser chain reads batch through Multicall3** (deployed on Robinhood Chain at the canonical address).
+- **D-071 Client-side verification only counts `Executed` logs from genuine vaults** (`factory.vaultOf(vault.owner()) == vault`); the oracle-price check is shown "from API" because recomputing a past Chainlink price needs an archive node.
+- **D-072 "Withdraw max" of USDG keeps back the pending creator fee** (review F-6); held tokens are locked in the asset chips while following (F-2); `FeeUnpaid` / `TokenHeld` decoded with amounts.
+- **D-073 Web fork e2e runs on its own anvil (:8546)** and prefetches state inside an `evm_snapshot` because the free RPC prunes state within minutes.
