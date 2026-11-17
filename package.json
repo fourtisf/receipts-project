@@ -25,7 +25,8 @@
     "contracts:test": "cd packages/contracts && forge test",
     "check-config": "tsx scripts/check-config.ts",
     "verify-deployment": "tsx scripts/verify-deployment.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "e2e:fork": "tsx scripts/e2e-fork.ts"
   },
   "devDependencies": {
     "@types/node": "^20.19.0",

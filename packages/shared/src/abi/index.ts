@@ -4,4 +4,4 @@ export { receiptsVaultAbi } from './ReceiptsVault.js';
 export { vaultFactoryAbi } from './VaultFactory.js';
 export { aggregatorV3Abi } from './AggregatorV3Interface.js';
 export { swapRouter02Abi } from './ISwapRouter02.js';
-export { erc20Abi } from './IERC20.js';
+export { erc20Abi } from './IERC20Metadata.js';

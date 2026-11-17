@@ -86,6 +86,7 @@ model Strategy {
   aumUsd          Decimal          @default(0) @db.Decimal(38, 18)
   registeredTx    String
   registeredAt    DateTime
+  registeredBlock BigInt           @default(0) // for reorg rollback
   updatedAt       DateTime         @updatedAt
   commits         Commit[]
   equity          EquityPoint[]
@@ -115,7 +116,9 @@ model Commit {
   strategyId       Int
   strategy         Strategy     @relation(fields: [strategyId], references: [id])
   nonce            Int
-  hash             String       @unique
+  /// Not unique on purpose: anyone can register a strategy and commit a copy of another commit's hash; a unique
+  /// constraint would let that stall the indexer. (strategyId, nonce) is the identity.
+  hash             String
   status           CommitStatus
   committedAt      DateTime
   committedL2Block BigInt
@@ -123,7 +126,9 @@ model Commit {
   revealDeadline   DateTime
   revealedAt       DateTime?
   revealTx         String?
+  revealBlock      BigInt? // for reorg rollback
   missedTx         String?
+  missedBlock      BigInt? // for reorg rollback
   // public after reveal
   tokenIn          String?
   tokenOut         String?
@@ -139,6 +144,7 @@ model Commit {
   aiArtifact       AiArtifact?
 
   @@unique([strategyId, nonce])
+  @@index([hash])
   @@index([status])
   @@index([committedAt])
   @@index([strategyId, committedAt])
@@ -177,6 +183,7 @@ model Vault {
   ownerAddr      String       @unique
   createdTx      String
   createdAt      DateTime
+  createdBlock   BigInt       @default(0) // for reorg rollback
   followingId    Int?
   allocationUsd  Decimal      @default(0) @db.Decimal(38, 18)
   maxSlippageBps Int
@@ -296,6 +303,15 @@ model IndexerCursor {
   lastBlock     BigInt
   lastBlockHash String
   updatedAt     DateTime @updatedAt
+}
+
+/// Strategy metadata JSON served at /api/metadata/:hash. Content-addressed: hash = keccak256(utf8(canonical JSON)),
+/// so the metadataURI committed on-chain pins the exact metadata. Anyone can recompute the hash.
+model MetadataDoc {
+  hash        String   @id
+  json        Json
+  creatorAddr String
+  createdAt   DateTime @default(now())
 }
 
 model AlertLog {

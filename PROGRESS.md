@@ -34,7 +34,17 @@ forge test --match-path 'test/fork/*' --fork-url http://127.0.0.1:8545
 FOUNDRY_PROFILE=coverage forge coverage --no-match-path 'test/fork/*' --no-match-coverage 'test|script' --report summary
 ```
 
-Next: M2 indexer + read API.
+## M2 — Indexer + read API ✅
+
+Done
+- Worker: reorg-safe indexer (`apps/worker/src/indexer`), chunked `eth_getLogs` to `head − CONFIRMATIONS`, idempotent upserts, rollback on hash mismatch; handlers for every registry / factory / vault event; Chainlink snapshots at each commit; match check after reveal (critical alert on mismatch); Redis pub/sub for the WebSocket.
+- Jobs on BullMQ: `prices` (every 60 s), `stats` (every 5 min: equity curves, 30-day KPIs, followers, AUM, vault NAVs, GlobalStat).
+- API: all public GET endpoints from API.md (`/stats`, `/strategies`, `/strategies/:idOrSlug`, `/equity`, `/receipts`, `/receipts/latest`, `/receipts/:idOrHash` with `checks[]`, `/vaults/:owner`, `/vaults/house`, `/templates`, `/config/chain`, `/metadata/:hash`, `/health`) + WebSocket `/ws` (receipts / strategy:<id> / vault:<address>). Every response validated with the shared zod schemas; cache headers per API.md.
+- Template catalog with parameter ranges and validation (`packages/strategies/src/catalog.ts`).
+- Tests: API 13 (seeded schema, `app.inject`), worker 15 (match check, equity model, reorg rollback), shared 6.
+- **Acceptance**: `pnpm e2e:fork` deploys to the anvil fork, starts the real worker + API, sends commit → execute → reveal; the receipt was served by `GET /receipts/:id` as REVEALED / MATCH with all five checks ✓ **4.2 s after the commit was sent** (target ≤ 10 s).
+
+Next: M3 web (read-only).
 
 Known issues
 - Public dRPC rate-limits (429). Use a local anvil fork (pinned block) for development; a paid RPC key for production / CI fork tests (`RPC_URL` secret).

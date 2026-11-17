@@ -13,7 +13,7 @@ const contracts = [
   ['VaultFactory.sol', 'VaultFactory', 'vaultFactoryAbi'],
   ['IExternal.sol', 'AggregatorV3Interface', 'aggregatorV3Abi'],
   ['IExternal.sol', 'ISwapRouter02', 'swapRouter02Abi'],
-  ['IERC20.sol', 'IERC20', 'erc20Abi'],
+  ['IERC20Metadata.sol', 'IERC20Metadata', 'erc20Abi'],
 ];
 if (!existsSync(outDir)) {
   console.error(`No Foundry output at ${outDir}. Run \`forge build\` in packages/contracts first.`);

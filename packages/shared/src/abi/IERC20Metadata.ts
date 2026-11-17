@@ -1,4 +1,4 @@
-// AUTO-GENERATED from packages/contracts/out/IERC20.sol/IERC20.json by scripts/gen-abi.mjs — do not edit.
+// AUTO-GENERATED from packages/contracts/out/IERC20Metadata.sol/IERC20Metadata.json by scripts/gen-abi.mjs — do not edit.
 export const erc20Abi = [
   {
     "type": "function",
@@ -63,6 +63,45 @@ export const erc20Abi = [
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "decimals",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "name",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "symbol",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
       }
     ],
     "stateMutability": "view"

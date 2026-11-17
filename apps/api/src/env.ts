@@ -25,6 +25,11 @@ const EnvSchema = z.object({
   SIWE_CHAIN_ID: z.coerce.number().int().default(4663),
   CHAIN_ID: z.coerce.number().int().default(4663),
   RPC_URL: z.string().url().default('https://robinhood.drpc.org'),
+  /** RPC the browser should use (no secret keys). Falls back to the public endpoint. */
+  PUBLIC_RPC_URL: z
+    .string()
+    .url()
+    .default(process.env.NEXT_PUBLIC_RPC_URL || 'https://robinhood.drpc.org'),
   EXPLORER_URL: z.string().url().default('https://robinhoodchain.blockscout.com'),
   REGISTRY_ADDRESS: optionalAddr,
   FACTORY_ADDRESS: optionalAddr,

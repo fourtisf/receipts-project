@@ -9,6 +9,7 @@ export interface TokenInfo {
   symbol: string;
   /** checksummed */
   address: Address;
+  decimals: number;
   feed: Address;
   feedDescription: string;
   maxStaleness: number;
@@ -28,6 +29,7 @@ export const TOKENS: readonly TokenInfo[] = robinhoodConfig.tokens.map((t) => {
   return {
     symbol: t.symbol,
     address: getAddress(t.address),
+    decimals: t.decimals,
     feed: getAddress(t.feed),
     feedDescription: t.feedDescription,
     maxStaleness: t.maxStaleness,

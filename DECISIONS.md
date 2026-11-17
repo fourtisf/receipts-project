@@ -39,3 +39,18 @@ Decisions made while building, with the reason. Newest at the bottom of each sec
 - **D-028 Fork tests read `config/robinhood.json` directly** and fund the test owner by impersonating the deepest USDG pool (no storage hacks on the Paxos proxy).
 - **D-029 Deployment output:** `deployments/<chainId>.json`, or `deployments/fork.json` with `DEPLOYMENT_NAME=fork` (anvil forks also report chain 4663).
 - **D-030 Public dRPC is rate-limited (HTTP 429):** develop against a local anvil fork pinned to a block (anvil caches state); use a paid RPC key for production and CI fork tests.
+
+## M2 — indexer + read API
+
+- **D-031 `Commit.hash` is not unique** (index only). Anyone can register a strategy and commit a copy of another commit's hash; a unique constraint would let that stall the indexer forever. Identity is `(strategyId, nonce)`; `GET /receipts/<hash>` returns the earliest receipt with that hash.
+- **D-032 Schema additions (migration `m2_reorg_metadata`)**: `Commit.revealBlock`, `Commit.missedBlock`, `Strategy.registeredBlock`, `Vault.createdBlock` for exact reorg rollback; `MetadataDoc` (content-addressed strategy metadata).
+- **D-033 Strategy metadata is content-addressed**: `metadataURI = https://APP_DOMAIN/api/metadata/<keccak256(canonical JSON)>`. The on-chain URI pins the exact metadata and anyone can recompute the hash. Foreign URIs get neutral defaults ("Unnamed strategy", template `external`).
+- **D-034 Labels are never self-declared**: `AI` only when the strategy committed a non-zero `modelHash`; `HOUSE` only when the creator is in `HOUSE_CREATORS`.
+- **D-035 Vault logs are fetched by topic** (all `ReceiptsVault` event signatures) and filtered by known vault addresses, so indexing scales to any number of vaults; vaults created in a batch are known for their own constructor events in the same batch.
+- **D-036 Canonical state from chain reads**: after each batch the indexer re-reads touched strategies (`strategyOf`) and vaults (getters + `navLenient`), instead of re-deriving state from events. Counters (`commitCount`, `revealCount`, `missedCount`) come from the registry itself.
+- **D-037 Reorg handling**: on a hash mismatch at the cursor, roll back `REORG_REWIND` (64) blocks: delete executions / vault events / commits above the fork, undo reveals and missed marks above it, then refresh survivors from chain and re-index.
+- **D-038 Match check**: pair and direction must equal the revealed signal; buys may not exceed `sizeBps × allocation` + 2%. Under-sizing is accepted with a note (the executor clamps to daily limit, balance and allocation headroom). Sells are checked for pair/direction only.
+- **D-039 Equity model** (`apps/worker/src/stats/equity.ts`, documented in code): revealed signals applied at commit time, real volume-weighted vault fills when available ("live") otherwise the Chainlink price at the commit block plus 0.1% cost ("paper"); hourly marks from indexed Chainlink rounds; hold = equal-weight buy-and-hold. Missed commits never trade.
+- **D-040 Token decimals added to `config/robinhood.json`** (verified on-chain; re-checked by the fork test and `scripts/check-config.ts`).
+- **D-041 Fill price and oracle price on receipts** (`fillPriceUsd`, `oraclePriceUsd`, `slippageBps`) to render the prototype's receipt lines.
+- **D-042 Tests use a fresh Postgres schema per file** (`@receipts/db/testing`, non-destructive `migrate deploy`, dropped afterwards); `prisma migrate reset` is never used by tooling.
