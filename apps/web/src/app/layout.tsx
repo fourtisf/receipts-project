@@ -3,6 +3,7 @@ import localFont from 'next/font/local';
 import { GeistMono } from 'geist/font/mono';
 import { APP_NAME } from '@/lib/env';
 import './globals.css';
+import { ErrorReporter } from '@/components/ErrorReporter';
 
 // Self-hosted Plus Jakarta Sans (variable, latin subset) from @fontsource-variable, preloaded with a
 // metric-matched fallback so text does not shift when the font arrives.
@@ -44,7 +45,10 @@ export const viewport: Viewport = { themeColor: '#FFFFFF', width: 'device-width'
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${jakarta.variable} ${GeistMono.variable}`}>
-      <body className="bg-bg font-sans text-ink antialiased">{children}</body>
+      <body className="bg-bg font-sans text-ink antialiased">
+        <ErrorReporter />
+        {children}
+      </body>
     </html>
   );
 }

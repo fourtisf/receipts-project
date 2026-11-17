@@ -359,6 +359,8 @@ export const authNonceSchema = z.object({
   uri: z.string().optional(),
 });
 export const authMeSchema = z.object({ address: z.string() });
+/** GET /auth/session: always 200, `address: null` when signed out. */
+export const authSessionSchema = z.object({ address: z.string().nullable() });
 
 export const geoSchema = z.object({
   country: z.string().nullable(),

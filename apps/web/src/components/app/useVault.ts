@@ -9,11 +9,11 @@ import { ClientApiError, fetchApi } from '@/lib/api.client';
  * The connected wallet's vault from the indexer (`GET /vaults/:owner`). `vault === null` means the
  * wallet has no vault yet (API answers 404 NO_VAULT).
  */
-export function useMyVault() {
+export function useMyVault(enabled = true) {
   const { address, isConnected, status } = useAccount();
   const q = useQuery<Vault | null, ClientApiError>({
     queryKey: ['vault', address?.toLowerCase()],
-    enabled: Boolean(address),
+    enabled: Boolean(address) && enabled,
     refetchInterval: 15_000,
     queryFn: async ({ signal }) => {
       try {
@@ -29,7 +29,7 @@ export function useMyVault() {
     isConnected,
     connecting: status === 'connecting' || status === 'reconnecting',
     vault: q.data,
-    loading: q.isPending && Boolean(address),
+    loading: q.isPending && Boolean(address) && enabled,
     error: q.error,
   };
 }

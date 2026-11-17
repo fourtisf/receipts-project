@@ -130,6 +130,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return { address: user.address };
   });
 
+  /** Like /auth/me but always 200 (`address: null` when signed out), for pages that only want to know. */
+  app.get('/auth/session', async (req, reply) => {
+    const user = await sessionUser(app, req);
+    reply.header('Cache-Control', 'no-store');
+    return { address: user?.address ?? null };
+  });
+
   app.post('/auth/logout', async (req, reply) => {
     const sid = readSid(app, req);
     if (sid) await prisma.session.deleteMany({ where: { id: sid } });

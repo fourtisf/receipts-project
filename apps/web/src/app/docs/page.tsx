@@ -62,9 +62,9 @@ export default async function DocsPage() {
             cannot be skipped or reordered.
           </li>
           <li>
-            <strong>Execute.</strong> In a <em>later</em> L2 block, the executor swaps inside each following
-            vault, through the pinned Uniswap pool, within that vault’s limits. The vault refuses a signal
-            that is not a live commit of the strategy it follows.
+            <strong>Execute.</strong> In a later L2 block, the executor swaps inside each following vault,
+            through the pinned Uniswap pool, within that vault’s limits. The vault refuses a signal that is
+            not a live commit of the strategy it follows.
           </li>
           <li>
             <strong>Reveal.</strong> Before the reveal deadline (10 minutes to 24 hours, fixed per strategy),
@@ -107,7 +107,7 @@ export default async function DocsPage() {
           </li>
           <li>
             <strong>Drawdown breaker</strong> (5–50%): trading pauses by itself when the vault falls that far
-            from its peak. You re-arm it with <em>Reset peak</em>.
+            from its peak. You re-arm it with Reset peak.
           </li>
           <li>
             <strong>Pause</strong> stops trading; <strong>Revoke bot access</strong> (

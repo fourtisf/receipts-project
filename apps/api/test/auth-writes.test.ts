@@ -74,6 +74,10 @@ describe('SIWE auth', () => {
     const cookie = await login();
     const me = await app.inject({ url: '/auth/me', headers: { cookie } });
     expect(me.json()).toEqual({ address: account.address.toLowerCase() });
+    expect((await app.inject({ url: '/auth/session', headers: { cookie } })).json()).toEqual({
+      address: account.address.toLowerCase(),
+    });
+    expect((await app.inject({ url: '/auth/session' })).json()).toEqual({ address: null });
     await app.inject({ method: 'POST', url: '/auth/logout', headers: { cookie } });
     expect((await app.inject({ url: '/auth/me', headers: { cookie } })).statusCode).toBe(401);
   });

@@ -187,47 +187,44 @@ function HoldingRow({
     if (r) setAmt('');
   };
   return (
-    <tr>
-      <td className="lead !min-w-0">
+    <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line-2 py-3.5">
+      <div className="min-w-0">
         <span className="sname">{t.symbol}</span>
         {!t.enabled ? <span className="tag">Off</span> : null}
-      </td>
-      <td data-l="Balance" className="num">
-        {fmtToken(t.balance, t.decimals)}
-      </td>
-      <td data-l="Value (USD)" className="num">
-        {t.valueUsd === null ? 'price stale' : fmtUnits(t.valueUsd, USD)}
-      </td>
-      <td data-l="Withdraw" className="!whitespace-normal">
-        <form
-          className="flex items-center justify-end gap-1.5 max-[800px]:justify-start"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void withdraw();
-          }}
+        <p className="font-mono text-[13px] text-muted">
+          {fmtToken(t.balance, t.decimals)}
+          {' · '}
+          {t.valueUsd === null ? 'price stale' : `${fmtUnits(t.valueUsd, USD)} USD`}
+        </p>
+      </div>
+      <form
+        className="flex items-center gap-1.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void withdraw();
+        }}
+      >
+        <input
+          className="input !h-9 w-[110px] !text-[14px]"
+          inputMode="decimal"
+          aria-label={`Amount of ${t.symbol} to withdraw`}
+          placeholder="Amount"
+          value={amt}
+          onChange={(e) => setAmt(e.target.value)}
+        />
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={() => setAmt(fmtToken(maxOut, t.decimals, t.decimals).replace(/,/g, ''))}
+          title={isBase && pendingFeeBase > 0n ? 'Keeps back the creator fee that is due' : undefined}
         >
-          <input
-            className="input !h-9 w-[120px] !text-[14px]"
-            inputMode="decimal"
-            aria-label={`Amount of ${t.symbol} to withdraw`}
-            placeholder="Amount"
-            value={amt}
-            onChange={(e) => setAmt(e.target.value)}
-          />
-          <button
-            type="button"
-            className="btn btn-sm"
-            onClick={() => setAmt(fmtToken(maxOut, t.decimals, t.decimals).replace(/,/g, ''))}
-            title={isBase && pendingFeeBase > 0n ? 'Keeps back the creator fee that is due' : undefined}
-          >
-            Max
-          </button>
-          <button type="submit" className="btn btn-sm btn-dark">
-            Withdraw
-          </button>
-        </form>
-      </td>
-    </tr>
+          Max
+        </button>
+        <button type="submit" className="btn btn-sm btn-dark" aria-label={`Withdraw ${t.symbol}`}>
+          Withdraw
+        </button>
+      </form>
+    </li>
   );
 }
 
@@ -247,34 +244,11 @@ function HoldingsCard({ vault }: { vault: VaultChainState }) {
       {held.length === 0 ? (
         <p className="help">The vault holds no tokens yet. Deposit USDG to start.</p>
       ) : (
-        <div className="tablecard !shadow-none">
-          <table className="table stack">
-            <thead>
-              <tr>
-                <th scope="col">Token</th>
-                <th scope="col" className="num">
-                  Balance
-                </th>
-                <th scope="col" className="num">
-                  Value (USD)
-                </th>
-                <th scope="col" className="num">
-                  Withdraw
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {held.map((t) => (
-                <HoldingRow
-                  key={t.address}
-                  t={t}
-                  vault={vault.address}
-                  pendingFeeBase={vault.pendingFeeBase}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul>
+          {held.map((t) => (
+            <HoldingRow key={t.address} t={t} vault={vault.address} pendingFeeBase={vault.pendingFeeBase} />
+          ))}
+        </ul>
       )}
     </div>
   );
@@ -388,55 +362,57 @@ function StrategyCard({ vault, followName }: { vault: VaultChainState; followNam
           ) : null}
         </>
       ) : null}
-      <form
-        className={following ? 'mt-5 border-t border-line-2 pt-5' : ''}
-        onSubmit={(e) => {
-          e.preventDefault();
-          void follow();
-        }}
-      >
-        <label className="field" htmlFor="followPick">
-          {following ? 'Switch to another strategy' : 'Strategy to copy'}
-        </label>
-        <select
-          id="followPick"
-          className="select mb-2 h-[46px] w-full"
-          value={pick}
-          onChange={(e) => setPick(e.target.value)}
+      {following && candidates.length === 0 && !list.isPending ? null : (
+        <form
+          className={following ? 'mt-5 border-t border-line-2 pt-5' : ''}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void follow();
+          }}
         >
-          <option value="">
-            {list.isPending
-              ? 'Loading strategies…'
-              : candidates.length
-                ? 'Choose a strategy'
-                : 'No strategies yet'}
-          </option>
-          {candidates.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name} · {s.market}
+          <label className="field" htmlFor="followPick">
+            {following ? 'Switch to another strategy' : 'Strategy to copy'}
+          </label>
+          <select
+            id="followPick"
+            className="select mb-2 h-[46px] w-full"
+            value={pick}
+            onChange={(e) => setPick(e.target.value)}
+          >
+            <option value="">
+              {list.isPending
+                ? 'Loading strategies…'
+                : candidates.length
+                  ? 'Choose a strategy'
+                  : 'No strategies yet'}
             </option>
-          ))}
-        </select>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            className="input min-w-[160px] flex-1"
-            inputMode="decimal"
-            placeholder="Allocation in USD"
-            aria-label="Allocation in USD"
-            value={newAlloc}
-            onChange={(e) => setNewAlloc(e.target.value)}
-          />
-          <button className="btn btn-dark h-[46px]" type="submit" disabled={blocked}>
-            {following ? 'Switch' : 'Copy strategy'}
-          </button>
-        </div>
-        {selected && tradesStocks(selected.category) ? (
-          <p className={`notice mt-3${blocked ? ' warn' : ''}`}>
-            {geo.data?.notice ?? 'Robinhood Stock Tokens are not available to US persons.'}
-            {blocked ? ' Copying stock-token strategies is not available in your region.' : ''}
-          </p>
-        ) : null}
-      </form>
+            {candidates.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} · {s.market}
+              </option>
+            ))}
+          </select>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              className="input min-w-[160px] flex-1"
+              inputMode="decimal"
+              placeholder="Allocation in USD"
+              aria-label="Allocation in USD"
+              value={newAlloc}
+              onChange={(e) => setNewAlloc(e.target.value)}
+            />
+            <button className="btn btn-dark h-[46px]" type="submit" disabled={blocked}>
+              {following ? 'Switch' : 'Copy strategy'}
+            </button>
+          </div>
+          {selected && tradesStocks(selected.category) ? (
+            <p className={`notice mt-3${blocked ? ' warn' : ''}`}>
+              {geo.data?.notice ?? 'Robinhood Stock Tokens are not available to US persons.'}
+              {blocked ? ' Copying stock-token strategies is not available in your region.' : ''}
+            </p>
+          ) : null}
+        </form>
+      )}
     </div>
   );
 }

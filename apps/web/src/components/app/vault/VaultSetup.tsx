@@ -22,7 +22,10 @@ export function VaultSetup({
   connected,
   maxDailyLimit,
   deployed,
+  onBusy,
 }: {
+  /** Told when the multi-transaction create flow starts / ends, so the page keeps this view until it is done. */
+  onBusy?: (busy: boolean) => void;
   connected: boolean;
   /** Beta cap in whole USD (factory MAX_DAILY_LIMIT_USD). */
   maxDailyLimit: number;
@@ -59,6 +62,18 @@ export function VaultSetup({
       toast({ message: 'Pick at least one asset strategies may trade.', tone: 'error' });
       return;
     }
+    onBusy?.(true);
+    try {
+      await createFlow();
+    } finally {
+      onBusy?.(false);
+      setProgress(null);
+      await qc.invalidateQueries();
+    }
+  };
+
+  const createFlow = async () => {
+    if (!cfg.factory || !client || !address) return;
     const disable = assets.filter((t) => !picked.has(t.symbol));
     const total = 1 + disable.length;
     setProgress(`Step 1 of ${total}: create the vault`);
@@ -72,10 +87,7 @@ export function VaultSetup({
       },
       { step: total > 1 ? `Step 1 of ${total}` : undefined, quiet: true, success: 'Vault created.' },
     );
-    if (!r) {
-      setProgress(null);
-      return;
-    }
+    if (!r) return;
     const vault = await client.readContract({
       address: cfg.factory,
       abi: vaultFactoryAbi,
@@ -106,8 +118,6 @@ export function VaultSetup({
       }
       toast({ message: 'Vault ready. Deposit USDG to start.', tone: 'ok' });
     }
-    setProgress(null);
-    await qc.invalidateQueries();
   };
 
   return (

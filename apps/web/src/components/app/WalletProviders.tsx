@@ -21,7 +21,11 @@ import {
   rainbowWallet,
   walletConnectWallet,
 } from '@rainbow-me/rainbowkit/wallets';
-import { authMeSchema as meSchema, authNonceSchema as nonceSchema } from '@receipts/shared';
+import {
+  authMeSchema as meSchema,
+  authNonceSchema as nonceSchema,
+  authSessionSchema as sessionSchema,
+} from '@receipts/shared';
 import { APP_NAME, PUBLIC_API_BASE, WALLETCONNECT_PROJECT_ID } from '@/lib/env';
 import { ChainConfigProvider, type ClientChainConfig } from '@/lib/chain-config';
 import { ToastProvider, useToast } from '@/components/Toast';
@@ -65,11 +69,10 @@ function SiweAuth({ cfg, children }: { cfg: ClientChainConfig; children: ReactNo
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${PUBLIC_API_BASE}/auth/me`, { cache: 'no-store', credentials: 'same-origin' })
+    fetch(`${PUBLIC_API_BASE}/auth/session`, { cache: 'no-store', credentials: 'same-origin' })
       .then(async (r) => {
         if (cancelled) return;
-        if (r.ok) setSessionAddr(meSchema.parse(await r.json()).address.toLowerCase());
-        else if (r.status === 401) setSessionAddr(null);
+        if (r.ok) setSessionAddr(sessionSchema.parse(await r.json()).address?.toLowerCase() ?? null);
         else {
           setAvailable(false);
           setSessionAddr(null);

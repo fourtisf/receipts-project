@@ -60,14 +60,14 @@ test.describe('landing', () => {
 
 test.describe('docs and legal', () => {
   for (const [path, heading] of [
-    ['/docs', 'How Receipts works'],
-    ['/terms', 'Terms of use'],
-    ['/privacy', 'Privacy'],
+    ['/docs', /^How .+ works$/],
+    ['/terms', /^Terms of use$/],
+    ['/privacy', /^Privacy$/],
   ] as const) {
     test(`${path} renders`, async ({ page }) => {
       const errors = watchConsole(page);
       await page.goto(path);
-      await expect(page.getByRole('heading', { level: 1 })).toContainText(heading.replace('Receipts', ''));
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(heading);
       await expect(page.locator('footer')).toContainText('Not investment advice');
       if (path !== '/docs')
         await expect(page.getByText('not yet reviewed by a lawyer', { exact: false })).toBeVisible();
@@ -148,7 +148,12 @@ test.describe('app', () => {
     const errors = watchConsole(page);
     await page.goto('/app/vault');
     await expect(page.getByRole('heading', { level: 1, name: 'Create your vault' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Connect wallet to create a vault' })).toBeVisible();
+    // with contracts configured: a connect prompt; without (local dev): an honest "not deployed" note
+    await expect(
+      page
+        .getByRole('button', { name: 'Connect wallet to create a vault' })
+        .or(page.getByText('not deployed on this network yet')),
+    ).toBeVisible();
     await expect(page.getByRole('heading', { name: 'House vaults' })).toBeVisible();
     await noHorizontalScroll(page);
     expect(errors).toEqual([]);

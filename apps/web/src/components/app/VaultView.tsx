@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { useChainConfig } from '@/lib/chain-config';
 import { strategyHref } from '@/lib/receipt';
@@ -18,8 +19,11 @@ export function VaultView({ followId, followName }: { followId: number | null; f
   const cfg = useChainConfig();
   const { isConnected, status } = useAccount();
   const chain = useVaultChain();
-  const api = useMyVault();
+  // the indexer's copy (activity log) is only asked for once the chain says a vault exists
+  const api = useMyVault(Boolean(chain.data?.vault));
   const cap = cfg.maxDailyLimitUsd ? Number(cfg.maxDailyLimitUsd) : 2000;
+  // keep the setup view mounted until its multi-transaction flow has finished
+  const [creating, setCreating] = useState(false);
 
   if (status === 'reconnecting' || status === 'connecting')
     return <div className="empty">Connecting to your wallet…</div>;
@@ -34,7 +38,7 @@ export function VaultView({ followId, followName }: { followId: number | null; f
       </div>
     );
   const data = chain.data;
-  if (!data.vault)
+  if (!data.vault || creating)
     return (
       <>
         {followId ? (
@@ -46,7 +50,12 @@ export function VaultView({ followId, followName }: { followId: number | null; f
             .
           </p>
         ) : null}
-        <VaultSetup connected maxDailyLimit={Math.floor(usdToNumber(data.maxDailyLimitUsd))} deployed />
+        <VaultSetup
+          connected
+          maxDailyLimit={Math.floor(usdToNumber(data.maxDailyLimitUsd))}
+          deployed
+          onBusy={setCreating}
+        />
       </>
     );
   return (
