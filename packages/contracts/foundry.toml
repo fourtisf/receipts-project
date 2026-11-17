@@ -26,6 +26,7 @@ seed = "0x52454345495054"
 runs = 128
 depth = 64
 fail_on_revert = false
+show_metrics = true
 
 [profile.ci.fuzz]
 runs = 2048
@@ -42,10 +43,10 @@ optimizer = false
 [rpc_endpoints]
 robinhood = "${RPC_URL}"
 
-[etherscan]
-robinhood = { key = "blockscout", url = "https://robinhoodchain.blockscout.com/api/", chain = 4663 }
-
 [fmt]
 line_length = 120
 tab_width = 4
 bracket_spacing = false
+
+[lint]
+lint_on_build = false

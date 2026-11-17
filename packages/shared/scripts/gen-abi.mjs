@@ -11,7 +11,8 @@ const contracts = [
   ['SignalRegistry.sol', 'SignalRegistry', 'signalRegistryAbi'],
   ['ReceiptsVault.sol', 'ReceiptsVault', 'receiptsVaultAbi'],
   ['VaultFactory.sol', 'VaultFactory', 'vaultFactoryAbi'],
-  ['IChainlink.sol', 'AggregatorV3Interface', 'aggregatorV3Abi'],
+  ['IExternal.sol', 'AggregatorV3Interface', 'aggregatorV3Abi'],
+  ['IExternal.sol', 'ISwapRouter02', 'swapRouter02Abi'],
   ['IERC20.sol', 'IERC20', 'erc20Abi'],
 ];
 if (!existsSync(outDir)) {

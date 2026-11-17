@@ -86,9 +86,13 @@ interface IReceiptsVault {
     function resetMarks() external;
 
     // operator
-    function executeSignal(uint64 nonce, address tokenIn, address tokenOut, uint256 amountIn, uint256 minOutFromOperator)
-        external
-        returns (uint256 amountOut);
+    function executeSignal(
+        uint64 nonce,
+        address tokenIn,
+        address tokenOut,
+        uint256 amountIn,
+        uint256 minOutFromOperator
+    ) external returns (uint256 amountOut);
 
     // anyone
     function checkBreaker() external returns (bool tripped);

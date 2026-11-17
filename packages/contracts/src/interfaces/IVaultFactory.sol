@@ -27,7 +27,9 @@ interface IVaultFactory {
     function defaultOperator() external view returns (address);
     function treasury() external view returns (address);
 
-    function createVault(uint16 maxSlippageBps, uint256 dailyLimitUsd, uint16 drawdownBps) external returns (address vault);
+    function createVault(uint16 maxSlippageBps, uint256 dailyLimitUsd, uint16 drawdownBps)
+        external
+        returns (address vault);
     function vaultOf(address owner) external view returns (address);
     function vaultCount() external view returns (uint256);
     function vaults(uint256 start, uint256 count) external view returns (address[] memory);
