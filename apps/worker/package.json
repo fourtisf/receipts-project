@@ -1,0 +1,32 @@
+{
+  "name": "worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "lint": "eslint src test --ext .ts --no-error-on-unmatched-pattern",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@receipts/db": "workspace:*",
+    "@receipts/shared": "workspace:*",
+    "@receipts/strategies": "workspace:*",
+    "bullmq": "^5.61.0",
+    "dotenv": "^16.6.1",
+    "ioredis": "^5.8.0",
+    "pino": "^9.14.0",
+    "viem": "^2.38.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "pino-pretty": "^11.3.0",
+    "tsx": "^4.20.0",
+    "typescript": "5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

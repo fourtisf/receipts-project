@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    name: lint · typecheck · test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: receipts
+          POSTGRES_PASSWORD: receipts
+          POSTGRES_DB: receipts
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U receipts" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://receipts:receipts@127.0.0.1:5432/receipts?schema=public
+      TEST_DATABASE_URL: postgresql://receipts:receipts@127.0.0.1:5432/receipts?schema=public
+      REDIS_URL: redis://127.0.0.1:6379
+      TEST_REDIS_URL: redis://127.0.0.1:6379
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install Foundry (anvil is used by integration tests)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prisma migrate deploy
+      - run: pnpm format:check
+      - run: pnpm turbo run build --filter=!web
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Build web
+        run: pnpm turbo run build --filter=web
+      - name: Dependency audit
+        run: pnpm audit --prod --audit-level critical
+
+  contracts:
+    name: forge build · test · coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/contracts
+    env:
+      RPC_URL: ${{ secrets.RPC_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+      - run: forge fmt --check
+      - run: forge build --sizes
+      - name: Unit, fuzz and invariant tests
+        run: FOUNDRY_PROFILE=ci forge test -vv --no-match-path 'test/fork/*'
+      - name: Fork tests against Robinhood Chain
+        if: env.RPC_URL != ''
+        run: forge test -vv --match-path 'test/fork/*' --fork-url "$RPC_URL"
+      - name: Gas snapshot
+        run: forge snapshot --no-match-path 'test/fork/*' --check --tolerance 5
+      - name: Coverage
+        run: FOUNDRY_PROFILE=coverage forge coverage --no-match-path 'test/fork/*' --no-match-coverage 'test|script' --report summary
+
+  slither:
+    name: slither
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: crytic/slither-action@v0.4.1
+        with:
+          target: packages/contracts
+          slither-config: packages/contracts/slither.config.json
+          fail-on: medium

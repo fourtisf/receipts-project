@@ -1,0 +1,17 @@
+node_modules
+dist
+.next
+coverage
+pnpm-lock.yaml
+packages/contracts/lib
+packages/contracts/out
+packages/contracts/cache
+packages/contracts/broadcast
+packages/shared/src/abi
+prototype
+reference
+specs
+*.sol
+*.md
+packages/shared/src/generated
+prisma/migrations

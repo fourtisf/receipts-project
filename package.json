@@ -1,0 +1,65 @@
+{
+  "name": "receipts",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Receipts \u2014 verifiable copy-trading on Robinhood Chain",
+  "license": "MIT",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel --filter=web --filter=api --filter=worker",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prisma": "prisma",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "abi:gen": "pnpm --filter @receipts/shared abi:gen",
+    "contracts:build": "cd packages/contracts && forge build",
+    "contracts:test": "cd packages/contracts && forge test",
+    "check-config": "tsx scripts/check-config.ts",
+    "verify-deployment": "tsx scripts/verify-deployment.ts",
+    "postinstall": "prisma generate"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.0",
+    "@typescript-eslint/parser": "^8.46.0",
+    "dotenv": "^16.6.1",
+    "eslint": "8.57.1",
+    "eslint-config-prettier": "^9.1.2",
+    "prettier": "^3.6.0",
+    "prisma": "6.19.3",
+    "tsx": "^4.20.0",
+    "turbo": "^2.5.0",
+    "typescript": "5.9.3",
+    "viem": "^2.38.0"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild",
+      "sharp",
+      "msgpackr-extract",
+      "bufferutil",
+      "utf-8-validate",
+      "keccak",
+      "secp256k1",
+      "protobufjs"
+    ]
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma"
+  }
+}

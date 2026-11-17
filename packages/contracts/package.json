@@ -1,0 +1,12 @@
+{
+  "name": "@receipts/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test",
+    "coverage": "FOUNDRY_PROFILE=coverage forge coverage --no-match-path 'test/fork/*' --report summary",
+    "lint": "forge fmt --check",
+    "typecheck": "echo 'solidity: compiled by forge build'"
+  }
+}

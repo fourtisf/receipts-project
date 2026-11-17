@@ -1,0 +1,308 @@
+// Receipts — Prisma schema (PostgreSQL 16)
+// Addresses and hashes are stored lowercase hex strings ("0x…").
+// Token amounts use Decimal(78,0) (uint256); USD values use 18-decimal fixed point Decimal(38,18).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── users & auth (SIWE) ─────────────────────────
+
+model User {
+  id         String     @id @default(cuid())
+  address    String     @unique
+  createdAt  DateTime   @default(now())
+  lastSeenAt DateTime   @default(now())
+  sessions   Session[]
+  strategies Strategy[] @relation("StrategyCreator")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  ip        String?
+  userAgent String?
+
+  @@index([userId])
+}
+
+model SiweNonce {
+  nonce     String    @id
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+}
+
+// ───────────────────────── strategies & receipts ─────────────────────────
+
+enum StrategyKind {
+  HOUSE
+  TEMPLATE
+  AI
+}
+
+enum StrategyCategory {
+  CRYPTO
+  STOCK
+  MIXED
+}
+
+model Strategy {
+  id              Int              @id // on-chain strategyId from SignalRegistry
+  slug            String           @unique
+  name            String
+  description     String
+  kind            StrategyKind
+  category        StrategyCategory
+  template        String // momentum | meanrev | ma_cross | rsi | dip | rebalance | rotation | ai_news
+  params          Json
+  assets          String[] // token symbols from config/robinhood.json
+  creatorAddr     String
+  creatorUserId   String?
+  creator         User?            @relation("StrategyCreator", fields: [creatorUserId], references: [id])
+  signerAddr      String
+  modelId         String?
+  modelHash       String?
+  creatorShareBps Int
+  revealWindowSec Int
+  metadataURI     String
+  active          Boolean          @default(true)
+  commitCount     Int              @default(0)
+  revealCount     Int              @default(0)
+  missedCount     Int              @default(0)
+  // cached stats, recomputed by the stats job (never typed in)
+  ret30d          Decimal?         @db.Decimal(12, 6)
+  hold30d         Decimal?         @db.Decimal(12, 6)
+  maxDrawdown30d  Decimal?         @db.Decimal(12, 6)
+  followers       Int              @default(0)
+  aumUsd          Decimal          @default(0) @db.Decimal(38, 18)
+  registeredTx    String
+  registeredAt    DateTime
+  updatedAt       DateTime         @updatedAt
+  commits         Commit[]
+  equity          EquityPoint[]
+
+  @@index([category])
+  @@index([kind])
+  @@index([active])
+}
+
+enum CommitStatus {
+  COMMITTED
+  REVEALED
+  MISSED
+}
+
+enum MatchStatus {
+  PENDING // not revealed yet
+  MATCH // every execution matches the revealed signal
+  MISMATCH // at least one execution differs (pair, direction or size out of tolerance)
+  NO_EXECUTION // revealed, no vault executed it (paper or zero followers)
+}
+
+/// One commit = one public receipt.
+model Commit {
+  id               String       @id @default(cuid())
+  receiptNo        Int          @unique @default(autoincrement())
+  strategyId       Int
+  strategy         Strategy     @relation(fields: [strategyId], references: [id])
+  nonce            Int
+  hash             String       @unique
+  status           CommitStatus
+  committedAt      DateTime
+  committedL2Block BigInt
+  commitTx         String
+  revealDeadline   DateTime
+  revealedAt       DateTime?
+  revealTx         String?
+  missedTx         String?
+  // public after reveal
+  tokenIn          String?
+  tokenOut         String?
+  sizeBps          Int?
+  promptHash       String?
+  salt             String?
+  // Chainlink snapshots used for paper performance
+  priceInAtCommit  Decimal?     @db.Decimal(38, 18)
+  priceOutAtCommit Decimal?     @db.Decimal(38, 18)
+  matchStatus      MatchStatus  @default(PENDING)
+  matchNote        String?
+  executions       Execution[]
+  aiArtifact       AiArtifact?
+
+  @@unique([strategyId, nonce])
+  @@index([status])
+  @@index([committedAt])
+  @@index([strategyId, committedAt])
+}
+
+/// Full AI prompt, inputs and output for AI strategies. Published at reveal; keccak256 must equal promptHash.
+model AiArtifact {
+  id          String    @id @default(cuid())
+  commitId    String    @unique
+  commit      Commit    @relation(fields: [commitId], references: [id], onDelete: Cascade)
+  model       String
+  prompt      String    @db.Text
+  inputs      Json
+  output      Json
+  promptHash  String
+  publishedAt DateTime?
+}
+
+/// Worker-only. Salt + signal kept encrypted (AES-256-GCM, key SALT_ENCRYPTION_KEY) until reveal. Never exposed by the API.
+model SecretSalt {
+  id         String    @id @default(cuid())
+  strategyId Int
+  nonce      Int
+  signalEnc  String
+  saltEnc    String
+  createdAt  DateTime  @default(now())
+  revealedAt DateTime?
+
+  @@unique([strategyId, nonce])
+}
+
+// ───────────────────────── vaults ─────────────────────────
+
+model Vault {
+  address        String       @id
+  ownerAddr      String       @unique
+  createdTx      String
+  createdAt      DateTime
+  followingId    Int?
+  allocationUsd  Decimal      @default(0) @db.Decimal(38, 18)
+  maxSlippageBps Int
+  dailyLimitUsd  Decimal      @db.Decimal(38, 18)
+  drawdownBps    Int
+  paused         Boolean      @default(false)
+  operator       String?
+  navUsd         Decimal      @default(0) @db.Decimal(38, 18)
+  peakNavUsd     Decimal      @default(0) @db.Decimal(38, 18)
+  hwmNavUsd      Decimal      @default(0) @db.Decimal(38, 18)
+  isHouse        Boolean      @default(false) // public house vaults shown on landing
+  updatedAt      DateTime     @updatedAt
+  executions     Execution[]
+  events         VaultEvent[]
+
+  @@index([followingId])
+}
+
+model Execution {
+  id                  String   @id @default(cuid())
+  vaultAddr           String
+  vault               Vault    @relation(fields: [vaultAddr], references: [address])
+  commitId            String
+  commit              Commit   @relation(fields: [commitId], references: [id])
+  strategyId          Int
+  nonce               Int
+  tokenIn             String
+  tokenOut            String
+  amountIn            Decimal  @db.Decimal(78, 0)
+  amountOut           Decimal  @db.Decimal(78, 0)
+  valueUsd            Decimal  @db.Decimal(38, 18)
+  minOut              Decimal  @db.Decimal(78, 0)
+  slippageVsOracleBps Int
+  txHash              String
+  logIndex            Int
+  blockNumber         BigInt
+  executedAt          DateTime
+
+  @@unique([txHash, logIndex])
+  @@index([commitId])
+  @@index([vaultAddr, executedAt])
+}
+
+enum VaultEventType {
+  CREATED
+  DEPOSITED
+  WITHDRAWN
+  FOLLOWED
+  UNFOLLOWED
+  ALLOCATION
+  LIMITS
+  PAUSED
+  OPERATOR
+  TOKEN
+  BREAKER
+  PEAK_RESET
+  MARKS_FROZEN
+  MARKS_RESET
+  FEES_SETTLED
+  FEE_DEFERRED
+}
+
+model VaultEvent {
+  id          String         @id @default(cuid())
+  vaultAddr   String
+  vault       Vault          @relation(fields: [vaultAddr], references: [address])
+  type        VaultEventType
+  data        Json
+  txHash      String
+  logIndex    Int
+  blockNumber BigInt
+  at          DateTime
+
+  @@unique([txHash, logIndex])
+  @@index([vaultAddr, at])
+}
+
+// ───────────────────────── prices, stats, infra ─────────────────────────
+
+model PricePoint {
+  id         BigInt   @id @default(autoincrement())
+  token      String // symbol
+  feed       String
+  priceUsd   Decimal  @db.Decimal(38, 18)
+  roundId    String
+  updatedAt  DateTime // feed updatedAt
+  observedAt DateTime @default(now())
+
+  @@unique([feed, roundId])
+  @@index([token, updatedAt])
+}
+
+/// Equity index per strategy (100 = start of series), plus buy-and-hold of the same market.
+model EquityPoint {
+  id         BigInt   @id @default(autoincrement())
+  strategyId Int
+  strategy   Strategy @relation(fields: [strategyId], references: [id])
+  at         DateTime
+  equity     Decimal  @db.Decimal(20, 8)
+  hold       Decimal  @db.Decimal(20, 8)
+
+  @@unique([strategyId, at])
+}
+
+model GlobalStat {
+  id              Int      @id @default(1)
+  receiptsPrinted Int      @default(0)
+  strategiesLive  Int      @default(0)
+  missedReveals   Int      @default(0)
+  tvlUsd          Decimal  @default(0) @db.Decimal(38, 18)
+  updatedAt       DateTime @updatedAt
+}
+
+/// Reorg-safe indexer progress, one row per stream (registry, factory, vaults).
+model IndexerCursor {
+  id            String   @id
+  lastBlock     BigInt
+  lastBlockHash String
+  updatedAt     DateTime @updatedAt
+}
+
+model AlertLog {
+  id        String   @id @default(cuid())
+  level     String // info | warn | critical
+  kind      String // low_gas | reveal_risk | indexer_lag | tx_failed | mismatch
+  message   String
+  data      Json?
+  createdAt DateTime @default(now())
+}

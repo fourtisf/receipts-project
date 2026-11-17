@@ -1,0 +1,28 @@
+node_modules/
+dist/
+.next/
+out/
+coverage/
+.turbo/
+*.log
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+
+# env / secrets — never commit
+.env
+.env.*
+!.env.example
+deploy/.env
+
+# foundry
+packages/contracts/out/
+packages/contracts/cache/
+packages/contracts/broadcast/*/31337/
+packages/contracts/broadcast/*/4663/dry-run/
+packages/contracts/lcov.info
+packages/contracts/report/
+
+# playwright
+apps/web/test-results/
+apps/web/playwright-report/
