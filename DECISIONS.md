@@ -100,3 +100,7 @@ Decisions made while building, with the reason. Newest at the bottom of each sec
 - **D-071 Client-side verification only counts `Executed` logs from genuine vaults** (`factory.vaultOf(vault.owner()) == vault`); the oracle-price check is shown "from API" because recomputing a past Chainlink price needs an archive node.
 - **D-072 "Withdraw max" of USDG keeps back the pending creator fee** (review F-6); held tokens are locked in the asset chips while following (F-2); `FeeUnpaid` / `TokenHeld` decoded with amounts.
 - **D-073 Web fork e2e runs on its own anvil (:8546)** and prefetches state inside an `evm_snapshot` because the free RPC prunes state within minutes.
+
+## Mainnet parameters (owner decisions)
+
+- **D-074 Protocol cut 10 % (1000 bps)**, **beta cap $2,000 per vault per day**, **treasury + factory admin = deployer wallet** for now (move to a Safe before public launch; vault treasuries are immutable per vault). The owner deploys from their own machine with an encrypted Foundry keystore (`docs/MAINNET.md`); no private key passes through this environment.
