@@ -5,10 +5,12 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { receiptDetailSchema, receiptListSchema, type ReceiptDetail } from '@receipts/shared';
 import { ClientApiError, fetchApi } from '@/lib/api.client';
-import { APP_NAME } from '@/lib/env';
+import { useChainConfig } from '@/lib/chain-config';
 import { receiptHref, strategyHref } from '@/lib/receipt';
+import { verifyOnChain, type ChainVerification } from '@/lib/verify-chain';
 import { ChecksList } from '@/components/receipt/ChecksList';
 import { FullSlip } from '@/components/receipt/ReceiptSlip';
+import { VerifiedChecks } from '@/components/receipt/VerifiedChecks';
 
 /** Normalises user input to an API id: receipt number, full commit hash, or strategyId-nonce. */
 export function parseReceiptQuery(raw: string): { id: string } | { error: string } {
@@ -26,7 +28,8 @@ type State =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
-  | { kind: 'done'; receipt: ReceiptDetail; checkedAt: number };
+  | { kind: 'done'; receipt: ReceiptDetail; checkedAt: number }
+  | { kind: 'chainOnly'; v: ChainVerification; strategyId: number; nonce: number };
 
 export function VerifyForm({ initialQuery }: { initialQuery: string }) {
   const router = useRouter();
@@ -34,6 +37,7 @@ export function VerifyForm({ initialQuery }: { initialQuery: string }) {
   const [query, setQuery] = useState(initialQuery);
   const [state, setState] = useState<State>({ kind: 'idle' });
   const abort = useRef<AbortController | null>(null);
+  const cfg = useChainConfig();
 
   const run = useCallback(
     async (raw: string) => {
@@ -52,6 +56,25 @@ export function VerifyForm({ initialQuery }: { initialQuery: string }) {
         router.replace(`${pathname ?? '/app/verify'}?q=${encodeURIComponent(parsed.id)}`, { scroll: false });
       } catch (e) {
         if (e instanceof DOMException && e.name === 'AbortError') return;
+        // API unreachable: a strategy-nonce id can still be verified straight from the chain
+        const pair = /^(\d+)-(\d+)$/.exec(parsed.id);
+        const apiDown = !(e instanceof ClientApiError) || e.status === 0 || e.status >= 500;
+        if (pair && apiDown && cfg.registry) {
+          try {
+            const v = await verifyOnChain({
+              rpcUrl: cfg.rpcUrl,
+              chainId: cfg.chainId,
+              registry: cfg.registry,
+              factory: cfg.factory,
+              strategyId: Number(pair[1]),
+              nonce: Number(pair[2]),
+            });
+            setState({ kind: 'chainOnly', v, strategyId: Number(pair[1]), nonce: Number(pair[2]) });
+            return;
+          } catch {
+            /* fall through to the API error */
+          }
+        }
         const message =
           e instanceof ClientApiError && e.status === 404
             ? 'No receipt with that number or hash yet. Check for a typo — new commits appear within seconds of confirmation.'
@@ -61,7 +84,7 @@ export function VerifyForm({ initialQuery }: { initialQuery: string }) {
         setState({ kind: 'error', message });
       }
     },
-    [pathname, router],
+    [pathname, router, cfg.registry, cfg.rpcUrl, cfg.chainId, cfg.factory],
   );
 
   useEffect(() => {
@@ -143,9 +166,22 @@ export function VerifyForm({ initialQuery }: { initialQuery: string }) {
             <div className="error" role="alert">
               {state.message}
             </div>
+          ) : state.kind === 'chainOnly' ? (
+            <>
+              <p className="notice ok mt-4">
+                <strong className="font-semibold">Verified from chain via {state.v.rpcHost}.</strong> The API
+                is unreachable, so this check read Robinhood Chain only (no oracle price comparison).
+              </p>
+              <ChecksList checks={state.v.checks} />
+              <p className="help">
+                <Link className="linkbtn" href={`/app/s/${state.strategyId}/receipt/${state.nonce}`}>
+                  Permalink
+                </Link>
+              </p>
+            </>
           ) : (
             <>
-              <ChecksList checks={state.receipt.checks} />
+              <VerifiedChecks receipt={state.receipt} />
               <p className="help">
                 Strategy:{' '}
                 <Link className="linkbtn" href={strategyHref(state.receipt.strategyId)}>
@@ -155,10 +191,6 @@ export function VerifyForm({ initialQuery }: { initialQuery: string }) {
                 <Link className="linkbtn" href={receiptHref(state.receipt)}>
                   Permalink
                 </Link>
-              </p>
-              <p className="help">
-                Checked via {APP_NAME} API (indexed chain events). Client-side verification straight from
-                Robinhood Chain is coming next.
               </p>
             </>
           )}

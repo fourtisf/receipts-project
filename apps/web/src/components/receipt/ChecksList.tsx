@@ -11,7 +11,7 @@ export function prettyDetail(detail: string): string {
 }
 
 /** The five receipt checks (commit found, reveal matches, executed after commit, price within oracle, balances). */
-export function ChecksList({ checks }: { checks: ReceiptCheck[] }) {
+export function ChecksList({ checks }: { checks: (ReceiptCheck & { source?: 'chain' | 'api' })[] }) {
   return (
     <ul className="checks mt-5">
       {checks.map((c) => {
@@ -27,6 +27,7 @@ export function ChecksList({ checks }: { checks: ReceiptCheck[] }) {
                 <span className="sr-only">
                   {c.ok === true ? ' (passed)' : c.ok === false ? ' (failed)' : ' (not applicable yet)'}
                 </span>
+                {c.source === 'api' ? <span className="tag">from API</span> : null}
               </strong>
               <span className="d" title={c.detail}>
                 {prettyDetail(c.detail)}

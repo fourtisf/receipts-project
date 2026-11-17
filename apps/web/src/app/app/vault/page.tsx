@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { chainConfigSchema, houseVaultListSchema, robinhoodConfig, TOKENS } from '@receipts/shared';
+import { houseVaultListSchema, strategyDetailSchema } from '@receipts/shared';
 import { apiTry } from '@/lib/api.server';
 import { APP_NAME } from '@/lib/env';
 import { amount } from '@/lib/format';
@@ -12,23 +12,19 @@ import { ExtLink } from '@/components/ui';
 
 export const metadata: Metadata = { title: 'Vault' };
 
-export default async function VaultPage() {
-  const [cfg, house] = await Promise.all([
-    apiTry('/config/chain', chainConfigSchema, 300),
+export default async function VaultPage({ searchParams }: { searchParams: { follow?: string | string[] } }) {
+  const followId =
+    typeof searchParams.follow === 'string' && /^\d+$/.test(searchParams.follow)
+      ? Number(searchParams.follow)
+      : null;
+  const [house, follow] = await Promise.all([
     apiTry('/vaults/house', houseVaultListSchema, 30),
+    followId ? apiTry(`/strategies/${followId}`, strategyDetailSchema) : Promise.resolve(null),
   ]);
-  const explorer = cfg.ok ? cfg.data.explorer : robinhoodConfig.explorer;
-  const assets = (
-    cfg.ok ? cfg.data.tokens.filter((t) => t.kind !== 'base') : TOKENS.filter((t) => t.kind !== 'base')
-  ).map((t) => t.symbol);
 
   return (
     <AppPage crumbs={[{ label: 'Vault' }]}>
-      <VaultView
-        explorer={explorer}
-        maxDailyLimitUsd={cfg.ok ? cfg.data.maxDailyLimitUsd : null}
-        assets={assets}
-      />
+      <VaultView followId={followId} followName={follow?.ok ? follow.data.name : null} />
 
       <h2 className="mb-1 mt-10 text-[19px] font-bold tracking-[-0.02em]">House vaults</h2>
       <p className="mb-3.5 text-[14.5px] text-muted">

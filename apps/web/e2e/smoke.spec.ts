@@ -58,6 +58,25 @@ test.describe('landing', () => {
   });
 });
 
+test.describe('docs and legal', () => {
+  for (const [path, heading] of [
+    ['/docs', 'How Receipts works'],
+    ['/terms', 'Terms of use'],
+    ['/privacy', 'Privacy'],
+  ] as const) {
+    test(`${path} renders`, async ({ page }) => {
+      const errors = watchConsole(page);
+      await page.goto(path);
+      await expect(page.getByRole('heading', { level: 1 })).toContainText(heading.replace('Receipts', ''));
+      await expect(page.locator('footer')).toContainText('Not investment advice');
+      if (path !== '/docs')
+        await expect(page.getByText('not yet reviewed by a lawyer', { exact: false })).toBeVisible();
+      await noHorizontalScroll(page);
+      expect(errors).toEqual([]);
+    });
+  }
+});
+
 test.describe('app', () => {
   test('strategies list renders KPIs, filters and table', async ({ page }) => {
     const errors = watchConsole(page);
@@ -104,7 +123,7 @@ test.describe('app', () => {
   test('verify form validates input and checks a receipt', async ({ page, request }) => {
     const errors = watchConsole(page);
     await page.goto('/app/verify');
-    await expect(page.getByText('Checked via', { exact: false }).first()).toBeVisible();
+    await expect(page.getByText('re-checks it against Robinhood Chain', { exact: false })).toBeVisible();
     await page.locator('#verifyInput').fill('0x1234');
     await page.getByRole('button', { name: 'Check receipt' }).click();
     await expect(page.locator('.error[role="alert"]')).toContainText('incomplete');
@@ -116,6 +135,10 @@ test.describe('app', () => {
       await page.getByRole('button', { name: 'Check receipt' }).click();
       await expect(page.locator('.checks li')).toHaveCount(5);
       await expect(page).toHaveURL(new RegExp(`q=${items[0]!.receiptNo}`));
+      // the page says which source it used: chain (verified in the browser) or API (fallback)
+      await expect(page.getByTestId('checks-source')).toHaveAttribute('data-source', /^(chain|api)$/, {
+        timeout: 30_000,
+      });
     }
     await noHorizontalScroll(page);
     expect(errors).toEqual([]);
@@ -127,6 +150,18 @@ test.describe('app', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Create your vault' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Connect wallet to create a vault' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'House vaults' })).toBeVisible();
+    await noHorizontalScroll(page);
+    expect(errors).toEqual([]);
+  });
+
+  test('create strategy page renders the form and the preview', async ({ page }) => {
+    const errors = watchConsole(page);
+    await page.goto('/app/create');
+    await expect(page.getByRole('heading', { level: 1, name: 'Create strategy' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Backtest preview' })).toBeVisible();
+    await expect(page.getByLabel('Template')).toBeVisible();
+    await expect(page.getByText('Sign in to run the backtest preview', { exact: false })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Create strategy' })).toHaveAttribute('aria-current', 'page');
     await noHorizontalScroll(page);
     expect(errors).toEqual([]);
   });

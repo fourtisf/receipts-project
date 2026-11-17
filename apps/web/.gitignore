@@ -1,0 +1,2 @@
+# isolated dev server used by `pnpm e2e:fork`
+.next-e2e/

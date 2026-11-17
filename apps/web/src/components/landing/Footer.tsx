@@ -10,7 +10,7 @@ export function Footer({ registry, factory }: { registry: string | null; factory
   const verify: [string, string][] = [];
   if (registry) verify.push(['Contracts', explorerAddress(registry)]);
   if (LINKS.github) verify.push(['GitHub', LINKS.github]);
-  if (LINKS.docs) verify.push(['Docs', LINKS.docs]);
+  verify.push(['Docs', LINKS.docs ?? '/docs']);
   const social: [string, string][] = [];
   if (LINKS.x) social.push(['X', LINKS.x]);
   if (LINKS.telegram) social.push(['Telegram', LINKS.telegram]);
@@ -50,11 +50,23 @@ export function Footer({ registry, factory }: { registry: string | null; factory
               <div>
                 <p className="mb-3 text-[13.5px] font-semibold text-faint">Verify</p>
                 <nav className="grid gap-2" aria-label="Verify">
-                  {verify.map(([label, href]) => (
-                    <a key={label} className={linkCls} href={href} target="_blank" rel="noopener noreferrer">
-                      {label}
-                    </a>
-                  ))}
+                  {verify.map(([label, href]) =>
+                    href.startsWith('/') ? (
+                      <Link key={label} className={linkCls} href={href}>
+                        {label}
+                      </Link>
+                    ) : (
+                      <a
+                        key={label}
+                        className={linkCls}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {label}
+                      </a>
+                    ),
+                  )}
                 </nav>
               </div>
             ) : null}
@@ -91,7 +103,16 @@ export function Footer({ registry, factory }: { registry: string | null; factory
           </div>
         ) : null}
         <div className="flex flex-wrap justify-between gap-4 border-t border-line-2 pt-[22px] text-[13.5px] text-faint">
-          <span>Not investment advice. Robinhood Stock Tokens are not available to US persons.</span>
+          <span>
+            Not investment advice. Robinhood Stock Tokens are not available to US persons.{' '}
+            <Link href="/terms" className="hover:text-ink">
+              Terms
+            </Link>
+            {' · '}
+            <Link href="/privacy" className="hover:text-ink">
+              Privacy
+            </Link>
+          </span>
           <span>
             © {new Date().getFullYear()} {APP_NAME}
           </span>

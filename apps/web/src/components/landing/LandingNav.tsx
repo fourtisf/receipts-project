@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { APP_NAME, LINKS } from '@/lib/env';
 import { LogoMark } from '@/components/ui';
@@ -14,6 +15,7 @@ const SECTIONS = [
 
 export function LandingNav() {
   const [scrolled, setScrolled] = useState(false);
+  const home = usePathname() === '/';
   useEffect(() => {
     const on = () => setScrolled(window.scrollY > 8);
     on();
@@ -32,7 +34,7 @@ export function LandingNav() {
           {SECTIONS.map(([id, label]) => (
             <a
               key={id}
-              href={`#${id}`}
+              href={home ? `#${id}` : `/#${id}`}
               className="text-[15px] font-medium text-muted transition-colors duration-150 hover:text-ink"
             >
               {label}
@@ -42,7 +44,7 @@ export function LandingNav() {
         <div className="ml-auto flex items-center gap-[18px]">
           <a
             className="text-[15px] font-medium text-muted hover:text-ink max-[800px]:hidden"
-            href={LINKS.docs ?? '#how'}
+            href={LINKS.docs ?? '/docs'}
           >
             Docs
           </a>

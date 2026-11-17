@@ -9,12 +9,11 @@ import {
   type ReceiptDetail,
 } from '@receipts/shared';
 import { ApiError, apiGet, apiTry } from '@/lib/api.server';
-import { APP_NAME } from '@/lib/env';
 import { amount, bpsPct, dateTimeUtc, nf, short, tokenAmount } from '@/lib/format';
 import { shortAddr } from '@/lib/address';
 import { revealState, strategyHref, tradeLabel } from '@/lib/receipt';
 import { AppPage, PageHead } from '@/components/app/AppPage';
-import { ChecksList } from '@/components/receipt/ChecksList';
+import { VerifiedChecks } from '@/components/receipt/VerifiedChecks';
 import { FullSlip } from '@/components/receipt/ReceiptSlip';
 import { ExtLink } from '@/components/ui';
 import { LiveRefresh } from '@/components/LiveRefresh';
@@ -95,10 +94,10 @@ export default async function ReceiptPage({ params }: Params) {
           <div className="card">
             <h2>Checks</h2>
             <p className="sub !mb-0">
-              Checked via {APP_NAME} API from indexed Robinhood Chain events. Every transaction links to
-              Blockscout.
+              Commit found, reveal matches, executed after the commit, price within the oracle limit, balances
+              changed correctly. Every transaction links to Blockscout.
             </p>
-            <ChecksList checks={d.checks} />
+            <VerifiedChecks receipt={d} />
           </div>
 
           <div className="card">

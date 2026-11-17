@@ -150,7 +150,7 @@ export default async function StrategyPage({ params }: Params) {
         </div>
 
         <aside className="sticky top-[88px] grid gap-4 max-[1060px]:static">
-          <CopyPanel strategyName={s.name} />
+          <CopyPanel strategy={{ id: s.id, name: s.name, category: s.category, active: s.active }} />
           <OnChainFacts s={s} />
         </aside>
       </div>

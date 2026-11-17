@@ -67,6 +67,26 @@ const NAV = [
       </>
     ),
   },
+  {
+    href: '/app/create',
+    label: 'Create strategy',
+    match: (p: string) => p.startsWith('/app/create'),
+    icon: (
+      <>
+        <rect
+          x="2.5"
+          y="2.5"
+          width="13"
+          height="13"
+          rx="3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+        />
+        <path d="M9 6v6M6 9h6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </>
+    ),
+  },
 ];
 
 function NetworkCard({

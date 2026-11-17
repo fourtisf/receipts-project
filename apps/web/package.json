@@ -9,7 +9,8 @@
     "lint": "next lint --dir src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:fork": "tsx e2e/fork/run.ts"
   },
   "dependencies": {
     "@fontsource-variable/plus-jakarta-sans": "^5.2.0",

@@ -11,8 +11,8 @@ export default function VerifyPage({ searchParams }: { searchParams: { q?: strin
     <AppPage crumbs={[{ label: 'Check a receipt' }]}>
       <PageHead title="Check a receipt">
         <p>
-          Paste a receipt number or commit hash. Checked via {APP_NAME} API, which serves indexed Robinhood
-          Chain events with links to every transaction.
+          Paste a receipt number or commit hash. Your browser re-checks it against Robinhood Chain (via{' '}
+          {APP_NAME} API as the fast path) and says which source it used.
         </p>
       </PageHead>
       <VerifyForm initialQuery={q} />

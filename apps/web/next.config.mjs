@@ -8,6 +8,8 @@ loadDotenv({ path: resolve(here, '../../.env') });
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // e2e:fork runs its own dev server next to a normal one; it builds into a separate directory
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ['@receipts/shared', 'geist'],
